@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
-  "binder-test",
+  "libbinder",
   "libbinder-raw"
 ]
 

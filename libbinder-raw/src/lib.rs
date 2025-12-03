@@ -7,8 +7,12 @@ use nix::errno::Errno;
 
 mod object_ref;
 mod object;
+mod write_read;
+mod commands;
 
 pub use object_ref::{ObjectRefRemote, ObjectRefLocal, ObjectRefFlags};
+pub use commands::{Command, ReturnVal};
+pub use write_read::binder_read_write;
 
 // Equivalent to struct binder_version
 #[repr(C)]
@@ -32,13 +36,15 @@ pub type BinderUsize = usize;
 
 mod ioctl {
   use nix::{ioctl_readwrite, ioctl_write_ptr};
-  use crate::{Version, object_ref::ObjectRefRaw};
+  use crate::{Version, object_ref::ObjectRefRaw, write_read::ReadWrite};
   
   const BINDER_IOC_MAGIC: u8  = b'b';
+  const BINDER_IOC_TYPE_WRITE_READ: u8 = 1;
   const BINDER_IOC_TYPE_VERSION: u8 = 9;
   const BINDER_IOC_SET_CONTEXT_MGR_EXT: u8 = 13;
 
   ioctl_readwrite!(ioctl_binder_version, BINDER_IOC_MAGIC, BINDER_IOC_TYPE_VERSION, Version);
+  ioctl_readwrite!(ioctl_binder_write_read, BINDER_IOC_MAGIC, BINDER_IOC_TYPE_WRITE_READ, ReadWrite);
   ioctl_write_ptr!(ioctl_set_context_mgr_ext, BINDER_IOC_MAGIC, BINDER_IOC_SET_CONTEXT_MGR_EXT, ObjectRefRaw);
 }
 
