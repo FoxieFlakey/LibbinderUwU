@@ -11,7 +11,7 @@ mod write_read;
 mod commands;
 mod transaction;
 
-pub use object_ref::{ObjectRefRemote, ObjectRefLocal, ObjectRefFlags};
+pub use object_ref::{ObjectRefRemote, ObjectRefLocal, ObjectRefFlags, ObjectRef};
 pub use commands::{Command, ReturnVal};
 pub use transaction::{TransactionDataCommon, TransactionFromKernel, TransactionToKernel, TransactionFlag, Transaction};
 pub use write_read::binder_read_write;

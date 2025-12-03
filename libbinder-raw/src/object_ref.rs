@@ -35,6 +35,22 @@ impl ObjectRefFlags {
 }
 
 #[derive(Clone)]
+pub enum ObjectRef {
+  Local(ObjectRefLocal),
+  Remote(ObjectRefRemote)
+}
+
+impl ObjectRef {
+  #[expect(unused)]
+  pub(crate) fn into_raw(&self) -> ObjectRefRaw {
+    match self {
+      ObjectRef::Local(x) => x.into_raw(),
+      ObjectRef::Remote(x) => x.into_raw()
+    }
+  }
+}
+
+#[derive(Clone)]
 pub struct ObjectRefLocal {
   // Whatever data can be in these, kernel won't touch it
   pub data: usize,
@@ -62,7 +78,6 @@ impl ObjectRefLocal {
 }
 
 impl ObjectRefRemote {
-  #[expect(unused)]
   pub(crate) fn into_raw(&self) -> ObjectRefRaw {
     ObjectRefRaw {
       header: ObjectHeader {
