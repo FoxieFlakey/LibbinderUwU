@@ -115,6 +115,7 @@ pub(crate) struct ObjectRefRaw {
 }
 
 // It is a union inside flat_binder_object
+#[repr(C)]
 union BinderOrHandleUnion {
   binder: BinderUsize,
   handle: u32

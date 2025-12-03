@@ -9,9 +9,11 @@ mod object_ref;
 mod object;
 mod write_read;
 mod commands;
+mod transaction;
 
 pub use object_ref::{ObjectRefRemote, ObjectRefLocal, ObjectRefFlags};
 pub use commands::{Command, ReturnVal};
+pub use transaction::{TransactionDataCommon, TransactionFromKernel, TransactionToKernel};
 pub use write_read::binder_read_write;
 
 // Equivalent to struct binder_version
