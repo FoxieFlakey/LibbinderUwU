@@ -1,6 +1,7 @@
 use std::{mem::ManuallyDrop, os::fd::BorrowedFd};
 
 use bytemuck::{Pod, Zeroable};
+use enumflags2::{BitFlags, bitflags};
 
 use crate::{BinderUsize, Command, binder_read_write};
 
@@ -10,10 +11,23 @@ pub struct TransactionDataCommon<'buf> {
   pub offsets: &'buf [BinderUsize]
 }
 
+#[bitflags]
+#[repr(u32)]
+#[derive(Clone, Copy)]
+pub enum TransactionFlag {
+  OneWay = 0x01,
+  RootObject = 0x04,
+  StatusCode = 0x08,
+  AcceptFds = 0x10,
+  ClearBuffer = 0x20,
+  UpdateTransaction = 0x40
+}
+
 pub struct TransactionToKernel<'buffer> {
   // A transaction to kernel, targetting this
   // object handle
   pub target: u32,
+  pub flags: BitFlags<TransactionFlag>,
   pub data: TransactionDataCommon<'buffer>
 }
 
@@ -34,7 +48,7 @@ impl TransactionToKernel<'_> {
       sender_pid: 0,
       sender_uid: 0,
       extra_data: 0,
-      flags: 0,
+      flags: self.flags.bits(),
       code: self.data.code,
       data: DataUnion {
         ptr: BufferStruct {
@@ -48,6 +62,7 @@ impl TransactionToKernel<'_> {
 pub struct TransactionFromKernel<'binder> {
   // A transaction from kernel targetting this object
   pub object: usize,
+  pub flags: BitFlags<TransactionFlag>,
   
   // Extra data associated with the object
   pub extra_data: usize,

@@ -1,6 +1,6 @@
 use std::{fmt::Write, fs::File, os::fd::AsFd};
 
-use libbinder_raw::{BINDER_COMPILED_VERSION, Command, ObjectRefLocal, TransactionDataCommon, TransactionToKernel, binder_read_write, binder_set_context_mgr, binder_version};
+use libbinder_raw::{BINDER_COMPILED_VERSION, Command, ObjectRefLocal, TransactionDataCommon, TransactionFlag, TransactionToKernel, binder_read_write, binder_set_context_mgr, binder_version};
 
 fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<64>();
@@ -41,6 +41,7 @@ fn main() {
       data_slice: &[],
       offsets: &[]
     },
+    flags: TransactionFlag::OneWay.into(),
     target: 0
   };
   
