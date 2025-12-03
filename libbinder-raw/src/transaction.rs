@@ -6,10 +6,15 @@ use enumflags2::{BitFlags, bitflags};
 
 use crate::{BinderUsize, Command, binder_read_write};
 
-pub struct TransactionDataCommon<'buf> {
+pub enum Transaction<'binder, 'buffer, 'buffer_offsets> {
+  Outgoing(TransactionToKernel<'buffer, 'buffer_offsets>),
+  Incoming(TransactionFromKernel<'binder>)
+}
+
+pub struct TransactionDataCommon<'buf, 'buf_offsets> {
   pub code: u32,
   pub data_slice: &'buf [u8],
-  pub offsets: &'buf [BinderUsize]
+  pub offsets: &'buf_offsets [BinderUsize]
 }
 
 #[bitflags]
@@ -24,15 +29,15 @@ pub enum TransactionFlag {
   UpdateTransaction = 0x40
 }
 
-pub struct TransactionToKernel<'buffer> {
+pub struct TransactionToKernel<'buffer, 'buffer_offsets> {
   // A transaction to kernel, targetting this
   // object handle
   pub target: u32,
   pub flags: BitFlags<TransactionFlag>,
-  pub data: TransactionDataCommon<'buffer>
+  pub data: TransactionDataCommon<'buffer, 'buffer_offsets>
 }
 
-impl TransactionToKernel<'_> {
+impl TransactionToKernel<'_, '_> {
   pub fn with_bytes<R, F: FnOnce(&[u8]) -> R>(&self, func: F) -> R {
     let raw = self.as_raw();
     let bytes = bytemuck::bytes_of(&raw);
@@ -76,11 +81,11 @@ pub struct TransactionFromKernel<'binder> {
   // as long as this struct alive. The getter method turn
   // it into proper borrow to ensure that by time when. Drop
   // runs this is dropped first and safe
-  data: ManuallyDrop<TransactionDataCommon<'static>>
+  data: ManuallyDrop<TransactionDataCommon<'static, 'static>>
 }
 
 impl<'binder> TransactionFromKernel<'binder> {
-  pub fn get_data<'a>(&'a self) -> &'a TransactionDataCommon<'a> {
+  pub fn get_data<'a>(&'a self) -> &'a TransactionDataCommon<'a, 'a> {
     &self.data
   }
   
