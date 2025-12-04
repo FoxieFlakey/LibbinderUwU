@@ -41,10 +41,10 @@ fn main() {
     data: TransactionDataCommon {
       code: 0,
       data_slice: &[],
-      offsets: &[]
+      offsets: &[],
+      flags: TransactionFlag::OneWay.into(),
+      target: libbinder_raw::ObjectRef::Remote(ObjectRefRemote { data_handle: 0})
     },
-    flags: TransactionFlag::OneWay.into(),
-    target: libbinder_raw::ObjectRef::Remote(ObjectRefRemote { data_handle: 0})
   };
   
   data.with_bytes(|bytes| {

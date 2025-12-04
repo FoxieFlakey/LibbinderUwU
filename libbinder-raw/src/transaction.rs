@@ -12,6 +12,8 @@ pub enum Transaction<'binder, 'buffer, 'buffer_offsets> {
 }
 
 pub struct TransactionDataCommon<'buf, 'buf_offsets> {
+  pub target: ObjectRef,
+  pub flags: BitFlags<TransactionFlag>,
   pub code: u32,
   pub data_slice: &'buf [u8],
   pub offsets: &'buf_offsets [BinderUsize]
@@ -30,8 +32,6 @@ pub enum TransactionFlag {
 }
 
 pub struct TransactionNotKernelMananged<'buffer, 'buffer_offsets> {
-  pub target: ObjectRef,
-  pub flags: BitFlags<TransactionFlag>,
   pub data: TransactionDataCommon<'buffer, 'buffer_offsets>
 }
 
@@ -43,7 +43,7 @@ impl TransactionNotKernelMananged<'_, '_> {
   }
   
   fn as_raw(&self) -> TransactionDataRaw {
-    let (target, extra_data) = match &self.target {
+    let (target, extra_data) = match &self.data.target {
       ObjectRef::Local(x) => (BinderOrHandleUnion { binder: x.data }, x.extra_data),
       ObjectRef::Remote(x) => (BinderOrHandleUnion { handle: x.data_handle }, 0)
     };
@@ -53,7 +53,7 @@ impl TransactionNotKernelMananged<'_, '_> {
       offsets_size: 0,
       sender_pid: 0,
       sender_uid: 0,
-      flags: self.flags.bits(),
+      flags: self.data.flags.bits(),
       code: self.data.code,
       data: DataUnion {
         ptr: BufferStruct {
@@ -67,9 +67,6 @@ impl TransactionNotKernelMananged<'_, '_> {
 }
 
 pub struct TransactionKernelManaged<'binder> {
-  pub object: ObjectRef,
-  pub flags: BitFlags<TransactionFlag>,
-  
   // Used by drop code
   binder_dev: BorrowedFd<'binder>,
   buffer_ptr: BinderUsize,
@@ -123,19 +120,19 @@ impl<'binder> TransactionKernelManaged<'binder> {
     
     Self {
       buffer_ptr: unsafe { raw.data.ptr.buffer },
-      object: if is_target_local {
-          ObjectRef::Local(ObjectRefLocal {
-            extra_data: raw.extra_data,
-            data: unsafe { raw.target.binder }
-          })
-        } else {
-          ObjectRef::Remote(ObjectRefRemote {
-            data_handle: unsafe { raw.target.handle },
-          })
-        },
-      flags: BitFlags::from_bits(raw.flags).ok().unwrap(),
       data: ManuallyDrop::new(TransactionDataCommon {
         code: raw.code,
+        target: if is_target_local {
+            ObjectRef::Local(ObjectRefLocal {
+              extra_data: raw.extra_data,
+              data: unsafe { raw.target.binder }
+            })
+          } else {
+            ObjectRef::Remote(ObjectRefRemote {
+              data_handle: unsafe { raw.target.handle },
+            })
+          },
+        flags: BitFlags::from_bits(raw.flags).ok().unwrap(),
         data_slice,
         offsets
       }),
