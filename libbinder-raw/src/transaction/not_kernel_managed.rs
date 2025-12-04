@@ -1,0 +1,36 @@
+use crate::{ObjectRef, TransactionDataCommon, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
+
+pub struct TransactionNotKernelMananged<'buffer, 'buffer_offsets> {
+  pub data: TransactionDataCommon<'buffer, 'buffer_offsets>
+}
+
+impl TransactionNotKernelMananged<'_, '_> {
+  pub fn with_bytes<R, F: FnOnce(&[u8]) -> R>(&self, func: F) -> R {
+    let raw = self.as_raw();
+    let bytes = bytemuck::bytes_of(&raw);
+    func(bytes)
+  }
+  
+  fn as_raw(&self) -> TransactionDataRaw {
+    let (target, extra_data) = match &self.data.target {
+      ObjectRef::Local(x) => (BinderOrHandleUnion { binder: x.data }, x.extra_data),
+      ObjectRef::Remote(x) => (BinderOrHandleUnion { handle: x.data_handle }, 0)
+    };
+    
+    TransactionDataRaw {
+      data_size: 0,
+      offsets_size: 0,
+      sender_pid: 0,
+      sender_uid: 0,
+      flags: self.data.flags.bits(),
+      code: self.data.code,
+      data: DataUnion {
+        ptr: BufferStruct {
+          buffer: 0, offsets: 0
+        }
+      },
+      extra_data,
+      target
+    }
+  }
+}
