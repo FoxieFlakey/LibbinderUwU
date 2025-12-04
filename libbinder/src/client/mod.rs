@@ -15,10 +15,9 @@ pub fn run(binder_dev: &File) {
   
   PacketBuilder::new()
     .set_binder_dev(binder_dev.as_fd())
-    .set_target(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }))
     .set_code(0)
     .build()
-    .send();
+    .send(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }));
   
   log!("Client stopped");
 }

@@ -44,15 +44,7 @@ impl<'binder> Packet<'binder> {
     });
   }
   
-  #[expect(unused)]
-  pub fn set_target(&mut self, target: ObjectRef) {
-    self.transaction.with_common_mut(|common| {
-      common.target = target;
-    });
-  }
-  
-  pub fn send(&self) -> Packet<'binder> {
-    let target = self.transaction.get_common().target.clone();
+  pub fn send(&self, target: ObjectRef) -> Packet<'binder> {
     if matches!(target, ObjectRef::Local(_)) {
       todo!("Handle local transaction");
     }
