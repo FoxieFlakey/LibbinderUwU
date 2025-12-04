@@ -12,6 +12,7 @@ pub enum ReturnValue<'binder> {
   Error(#[expect(unused)] i32),
   SpawnLooper,
   TransactionComplete,
+  DeadReply,
   Noop
 }
 
@@ -67,6 +68,7 @@ impl<'binder> ReturnBuffer<'binder> {
         ReturnVal::Ok => ReturnValue::Ok,
         ReturnVal::SpawnLooper => ReturnValue::SpawnLooper,
         ReturnVal::TransactionComplete => ReturnValue::TransactionComplete,
+        ReturnVal::DeadReply => ReturnValue::DeadReply,
         _ => panic!("Unimplemented: {:#?}", val_tag)
       };
       
