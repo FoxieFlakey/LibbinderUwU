@@ -1,7 +1,7 @@
-use std::{io, marker::PhantomData, os::fd::BorrowedFd};
+use std::{io, marker::PhantomData, os::fd::{AsFd, BorrowedFd}};
 
 use libbinder_raw::{Command as CommandRaw, Transaction, binder_read_write};
-use nix::errno::Errno;
+use nix::{errno::Errno, poll::{PollFd, PollFlags, PollTimeout, poll}};
 
 use crate::return_buffer::ReturnBuffer;
 
@@ -24,6 +24,9 @@ pub enum ExecResult {
   // All executed normally, with no EAGAIN
   Ok,
   
+  // The would block variants only occur
+  // if binder_dev is opened as O_NONBLOCK
+  
   // All commands were executed but the
   // read side would block
   WouldBlockOnRead,
@@ -42,6 +45,15 @@ pub enum ExecResult {
   // as resume index. Which can be passed
   // to 'exec' to try resume again
   WouldBlockOnWrite(usize)
+}
+
+impl ExecResult {
+  pub fn panic_if_blocking(&self) {
+    match self {
+      ExecResult::Ok => (),
+      ExecResult::WouldBlockOnRead | ExecResult::WouldBlockOnWrite(_) => panic!("Must not block")
+    }
+  }
 }
 
 impl<'binder, 'data> CommandBuffer<'binder, 'data> {
@@ -93,15 +105,20 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
   // if 2 commands executed then commands at index 0 and 1 is
   // always already executed
   pub fn exec(&mut self, return_buf: Option<&mut ReturnBuffer<'binder>>) -> Result<ExecResult, (usize, io::Error)> {
-    self.exec_impl(return_buf, None)
+    self.exec_impl(return_buf, None, false)
   }
   
   // Same as exec but resume from a specific command (also can be used to exec starting at specific point)
   pub fn exec_resume(&mut self, return_buf: Option<&mut ReturnBuffer<'binder>>, resume_cmd_idx: usize) -> Result<ExecResult, (usize, io::Error)> {
-    self.exec_impl(return_buf, Some(self.cmd_idx_to_buffer_idx(resume_cmd_idx)))
+    self.exec_impl(return_buf, Some(self.cmd_idx_to_buffer_idx(resume_cmd_idx)), false)
   }
   
-  fn exec_impl(&mut self, mut return_buf: Option<&mut ReturnBuffer<'binder>>, resume_offset: Option<usize>) -> Result<ExecResult, (usize, io::Error)> {
+  // Same as exec but will always block, and do poll as necessary
+  pub fn exec_always_block(&mut self, return_buf: Option<&mut ReturnBuffer<'binder>>) -> Result<(), (usize, io::Error)> {
+    self.exec_impl(return_buf, None, false).map(|x| x.panic_if_blocking())
+  }
+  
+  fn exec_impl(&mut self, mut return_buf: Option<&mut ReturnBuffer<'binder>>, resume_offset: Option<usize>, do_poll: bool) -> Result<ExecResult, (usize, io::Error)> {
     if let Some(buf) = return_buf.as_mut() {
       buf.clear();
     }
@@ -111,7 +128,26 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
     let bytes_written;
     let bytes_read;
     
-    loop {
+    'retry_loop: loop {
+      if do_poll {
+        // Poll loop to wait until ready
+        'poll_loop: loop {
+          let mut fds = [
+            PollFd::new(self.binder_dev.as_fd(), PollFlags::POLLIN | PollFlags::POLLOUT)
+          ];
+          
+          match poll(&mut fds, PollTimeout::NONE) {
+            Ok(_) => {
+              if fds[0].any().unwrap() {
+                break 'poll_loop;
+              }
+            },
+            Err(Errno::EINTR) => (),
+            Err(e) => panic!("Error polling: {e}")
+          }
+        }
+      }
+      
       match binder_read_write(self.binder_dev, write_buf, read_buf) {
         Ok(x) => {
           (bytes_written, bytes_read) = x;
@@ -122,6 +158,13 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
           read_buf = &mut read_buf[bytes_read..];
         }
         Err((Errno::EAGAIN, (bytes_written, bytes_read))) => {
+          if do_poll {
+            // Treat this EAGAIN as EINTR, if do_poll is true
+            write_buf = &write_buf[bytes_written..];
+            read_buf = &mut read_buf[bytes_read..];
+            continue 'retry_loop;
+          }
+          
           if let Some(buf) = return_buf {
             buf.parse(bytes_read);
           }
