@@ -1,13 +1,27 @@
-use std::{mem::ManuallyDrop, os::fd::BorrowedFd, slice};
+use std::{mem::ManuallyDrop, os::fd::BorrowedFd, slice, sync::Arc};
 
 use enumflags2::BitFlags;
 
 use crate::{BinderUsize, Command, ObjectRef, ObjectRefRemote, TransactionDataCommon, binder_read_write, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
 
-pub struct TransactionKernelManaged<'binder> {
-  // Used by drop code
+struct KernelBuffer<'binder> {
   binder_dev: BorrowedFd<'binder>,
-  buffer_ptr: BinderUsize,
+  buffer_ptr: BinderUsize
+}
+
+impl Drop for KernelBuffer<'_> {
+  fn drop(&mut self) {
+    // There no more reference to the buffer anymore, free the buffer
+    let mut commands = Vec::new();
+    commands.extend_from_slice(&Command::FreeBuffer.as_bytes());
+    commands.extend_from_slice(&self.buffer_ptr.to_ne_bytes());
+    
+    binder_read_write(self.binder_dev, &commands, &mut []).unwrap();
+  }
+}
+
+pub struct TransactionKernelManaged<'binder> {
+  _kernel_buf: Arc<KernelBuffer<'binder>>,
   
   // Cannot specifically make 'static is placeholder mean
   // as long as this struct alive. The getter method turn
@@ -105,7 +119,10 @@ impl<'binder> TransactionKernelManaged<'binder> {
     let offsets: &'static [usize] = unsafe { slice::from_raw_parts(raw.data.ptr.offsets as *mut _, raw.offsets_size) };
     
     Self {
-      buffer_ptr: unsafe { raw.data.ptr.buffer },
+      _kernel_buf: Arc::new(KernelBuffer {
+        buffer_ptr: unsafe { raw.data.ptr.buffer },
+        binder_dev
+      }),
       data: ManuallyDrop::new(TransactionDataCommon {
         code: raw.code,
         target: ObjectRef::Remote(ObjectRefRemote {
@@ -114,8 +131,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
         flags: BitFlags::from_bits(raw.flags).ok().unwrap(),
         data_slice,
         offsets
-      }),
-      binder_dev
+      })
     }
   }
 } 
@@ -125,11 +141,6 @@ impl Drop for TransactionKernelManaged<'_> {
     // SAFETY: 'static reference to the data cannot escape
     unsafe { ManuallyDrop::drop(&mut self.data) };
     
-    // There no more reference to the buffer anymore, free the buffer
-    let mut commands = Vec::new();
-    commands.extend_from_slice(&Command::FreeBuffer.as_bytes());
-    commands.extend_from_slice(&self.buffer_ptr.to_ne_bytes());
     
-    binder_read_write(self.binder_dev, &commands, &mut []).unwrap();
   }
 }
