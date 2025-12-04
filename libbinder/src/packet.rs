@@ -3,7 +3,7 @@ use std::os::fd::BorrowedFd;
 use enumflags2::BitFlags;
 use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
 
-use crate::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder, return_buffer::ReturnBuffer};
+use crate::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder, return_buffer::{ReturnBuffer, ReturnValue}};
 
 pub mod builder;
 
@@ -12,6 +12,7 @@ pub mod builder;
 //
 // Its immutable, after constructed. Except few attributes such as
 // flags, code, and target basically other than touching the buffers
+#[derive(Clone)]
 pub struct Packet<'binder> {
   binder_dev: BorrowedFd<'binder>,
   
@@ -87,7 +88,6 @@ impl<'binder> Packet<'binder> {
     )
   }
   
-  #[expect(unused)]
   pub fn set_code(&mut self, code: u32) {
     self.transaction.with_common_mut(|common| {
       common.code = code;
@@ -105,17 +105,46 @@ impl<'binder> Packet<'binder> {
     self.transaction.get_common().code
   }
   
-  pub fn send(&self, target: ObjectRef) -> Packet<'binder> {
+  pub fn send_as_reply(&self) {
+    CommandBuffer::new(self.binder_dev)
+      .enqueue_command(Command::SendReply(self.transaction.clone()))
+      .exec(Some(&mut ReturnBuffer::new(self.binder_dev, 4096)));
+  }
+  
+  pub fn send(&self, target: ObjectRef) {
     if matches!(target, ObjectRef::Local(_)) {
       todo!("Handle local transaction");
     }
     
     let mut transaction = self.transaction.clone();
+    let mut ret_buf = ReturnBuffer::new(self.binder_dev, 4096);
     transaction.with_common_mut(|x| x.target = target);
+    
+    // Send transaction
     CommandBuffer::new(self.binder_dev)
       .enqueue_command(Command::SendTransaction(transaction))
-      .exec(Some(&mut ReturnBuffer::new(self.binder_dev, 4096)));
-    todo!();
+      .exec(None);
+    
+    // Read reply
+    CommandBuffer::new(self.binder_dev)
+      .exec(Some(&mut ret_buf));
+    
+    ret_buf.get_parsed()
+      .iter()
+      .rev()
+      .for_each(|val| {
+        match val {
+          ReturnValue::Noop => (),
+          ReturnValue::Reply(reply) => {
+            // Got a reply
+            crate::common::log!("got reply of code {}", reply.get_code());
+          },
+          ReturnValue::TransactionComplete => {
+            crate::common::log!("Transaction completed (no reply data)");
+          },
+          _ => panic!("unhandled")
+        }
+      });
   }
 }
 

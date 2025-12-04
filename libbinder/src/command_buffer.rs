@@ -9,7 +9,6 @@ pub enum Command<'binder, 'data> {
   #[expect(unused)]
   ExitLooper,
   SendTransaction(Transaction<'binder, 'data, 'data>),
-  #[expect(unused)]
   SendReply(Transaction<'binder, 'data, 'data>),
   #[expect(unused)]
   RegisterLooper

@@ -29,9 +29,13 @@ pub fn run(binder_dev: &File) {
   CommandBuffer::new(binder_dev.as_fd()).exec(Some(&mut ret_buf));
   ret_buf.get_parsed()
     .iter()
+    .rev()
     .for_each(|ret| {
       if let ReturnValue::Transaction((_, packet)) = ret {
-        println!("Incoming transaction! code {}", packet.get_code());
+        log!("Incoming transaction! code {}", packet.get_code());
+        let mut response = packet.clone();
+        response.set_code(80386);
+        response.send_as_reply();
       } else if !matches!(ret, ReturnValue::Noop) {
         panic!("Unknown");
       }

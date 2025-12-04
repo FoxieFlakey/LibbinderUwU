@@ -6,7 +6,7 @@ use crate::packet::Packet;
 
 pub enum ReturnValue<'binder> {
   Transaction((ObjectRefLocal, Packet<'binder>)),
-  Reply(#[expect(unused)] Packet<'binder>),
+  Reply(Packet<'binder>),
   TransactionFailed,
   Ok,
   Error(#[expect(unused)] i32),
