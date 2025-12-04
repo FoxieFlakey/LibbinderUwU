@@ -10,6 +10,7 @@ mod process_sync;
 mod server;
 mod client;
 mod common;
+mod command_buffer;
 
 use common::log;
 

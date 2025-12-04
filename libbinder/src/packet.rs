@@ -1,9 +1,9 @@
-use std::{cell::RefCell, os::fd::BorrowedFd};
+use std::os::fd::BorrowedFd;
 
 use enumflags2::BitFlags;
-use libbinder_raw::{Command, ObjectRef, Transaction, TransactionFlag, binder_read_write};
+use libbinder_raw::{ObjectRef, Transaction, TransactionFlag};
 
-use crate::hexdump;
+use crate::command_buffer::{Command, CommandBuffer};
 
 pub mod builder;
 
@@ -57,25 +57,9 @@ impl<'binder> Packet<'binder> {
       todo!("Handle local transaction");
     }
     
-    thread_local! {
-      static BUFFER: RefCell<(Vec<u8>, Vec<u8>)> = RefCell::new((Vec::new(), Vec::new()));
-    }
-    
-    BUFFER.with_borrow_mut(|(write_buf, read_buf)| {
-      write_buf.clear();
-      read_buf.clear();
-      read_buf.resize(4000, 0);
-      
-      // Submit to binder kernel driver
-      // for remote transaction
-      write_buf.extend_from_slice(&Command::SendTransaction.as_bytes());
-      self.transaction.with_bytes(|bytes| write_buf.extend_from_slice(bytes));
-      
-      let (sent, received) = binder_read_write(self.binder_dev, write_buf, read_buf).unwrap();
-      println!("Sent {sent} bytes, received {received} bytes");
-      hexdump(&read_buf[..received]);
-    });
-    
+    CommandBuffer::new(self.binder_dev)
+      .enqueue_command(Command::SendTransaction(self.transaction.clone()))
+      .exec();
     todo!();
   }
 }
