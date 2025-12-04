@@ -1,4 +1,4 @@
-use std::{mem::ManuallyDrop, os::fd::BorrowedFd, slice, sync::Arc};
+use std::{os::fd::BorrowedFd, slice, sync::Arc};
 
 use enumflags2::BitFlags;
 
@@ -20,14 +20,17 @@ impl Drop for KernelBuffer<'_> {
   }
 }
 
+#[derive(Clone)]
 pub struct TransactionKernelManaged<'binder> {
-  _kernel_buf: Arc<KernelBuffer<'binder>>,
-  
   // Cannot specifically make 'static is placeholder mean
   // as long as this struct alive. The getter method turn
   // it into proper borrow to ensure that by time when. Drop
   // runs this is dropped first and safe
-  data: ManuallyDrop<TransactionDataCommon<'static, 'static>>
+  data: TransactionDataCommon<'static, 'static>,
+  
+  // has to come after the data, as the data refers to
+  // the kernel buffer
+  _kernel_buf: Arc<KernelBuffer<'binder>>
 }
 
 impl<'binder> TransactionKernelManaged<'binder> {
@@ -123,7 +126,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
         buffer_ptr: unsafe { raw.data.ptr.buffer },
         binder_dev
       }),
-      data: ManuallyDrop::new(TransactionDataCommon {
+      data: TransactionDataCommon {
         code: raw.code,
         target: ObjectRef::Remote(ObjectRefRemote {
           data_handle: unsafe { raw.target.handle },
@@ -131,16 +134,8 @@ impl<'binder> TransactionKernelManaged<'binder> {
         flags: BitFlags::from_bits(raw.flags).ok().unwrap(),
         data_slice,
         offsets
-      })
+      }
     }
   }
 } 
 
-impl Drop for TransactionKernelManaged<'_> {
-  fn drop(&mut self) {
-    // SAFETY: 'static reference to the data cannot escape
-    unsafe { ManuallyDrop::drop(&mut self.data) };
-    
-    
-  }
-}

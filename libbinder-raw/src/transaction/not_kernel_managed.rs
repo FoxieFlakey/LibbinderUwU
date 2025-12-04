@@ -1,5 +1,6 @@
 use crate::{ObjectRef, TransactionDataCommon, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
 
+#[derive(Clone)]
 pub struct TransactionNotKernelMananged<'buffer, 'buffer_offsets> {
   pub data: TransactionDataCommon<'buffer, 'buffer_offsets>
 }
