@@ -123,7 +123,7 @@ impl<'binder> Packet<'binder> {
   
   // If the transaction doesn't result anything. None is retured
   // else error if there error
-  pub fn send(&self, target: ObjectRef) -> Result<Option<Packet<'binder>>, PacketSendError> {
+  pub fn send(&self, target: ObjectRef) -> Result<Packet<'binder>, PacketSendError> {
     if matches!(target, ObjectRef::Local(_)) {
       todo!("Handle local transaction");
     }
@@ -144,6 +144,7 @@ impl<'binder> Packet<'binder> {
     let mut latest_reply = None;
     let mut is_dead = false;
     let mut cant_be_sent = false;
+    let mut completed = false;
     ret_buf.get_parsed()
       .iter()
       .rev()
@@ -151,7 +152,7 @@ impl<'binder> Packet<'binder> {
         match val {
           ReturnValue::Noop => (),
           ReturnValue::Reply(reply) => {
-            if mem::replace(&mut latest_reply, Some(Some(reply.clone()))).is_some() {
+            if mem::replace(&mut latest_reply, Some(reply.clone())).is_some() {
               panic!("There were multiple responses to one transaction");
             }
           },
@@ -162,20 +163,19 @@ impl<'binder> Packet<'binder> {
             cant_be_sent = true;
           }
           ReturnValue::TransactionComplete => {
-            if mem::replace(&mut latest_reply, Some(None)).is_some() {
-              panic!("There were multiple responses to one transaction");
-            }
+            completed = true;
           },
           _ => panic!("unhandled")
         }
       });
     
-    match (latest_reply, is_dead, cant_be_sent) {
-      (Some(reply), false, false) => Ok(reply),
-      (None, true, false) => Err(PacketSendError::DeadTarget),
-      (None, false, true) => Err(PacketSendError::Failed),
-      (None, false, false) => panic!("did not get any response for transaction from kernel"),
-      _ => panic!("ambigious condition")
+    let latest_reply_is_some = latest_reply.is_some(); 
+    match (latest_reply, is_dead, cant_be_sent, completed) {
+      (Some(reply), false, false, true) => Ok(reply),
+      (None, true, false, true) => Err(PacketSendError::DeadTarget),
+      (None, false, true, false) => Err(PacketSendError::Failed),
+      (None, false, false, false) => panic!("did not get any response for transaction from kernel"),
+      _ => panic!("ambigious condition, latest_reply.is_some = {latest_reply_is_some}, is_dead = {is_dead}, cant_be_sent = {cant_be_sent}, completed = {completed}")
     }
   }
 }

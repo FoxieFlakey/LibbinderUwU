@@ -19,7 +19,8 @@ pub fn run(binder_dev: &File) {
     .set_binder_dev(binder_dev.as_fd())
     .set_code(8086)
     .build()
-    .send(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }));
+    .send(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }))
+    .unwrap();
   
   log!("Client stopped");
 }
