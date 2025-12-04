@@ -1,9 +1,11 @@
 use std::os::fd::BorrowedFd;
 
+use libbinder_raw::ObjectRefLocal;
+
 use crate::packet::Packet;
 
 pub enum ReturnValue<'binder> {
-  Transaction(Packet<'binder>),
+  Transaction((ObjectRefLocal, Packet<'binder>)),
   Reply(Packet<'binder>)
 }
 
@@ -27,7 +29,6 @@ impl<'binder> ReturnBuffer<'binder> {
   }
   
   pub fn clear(&mut self) {
-    self.buffer.clear();
     self.parsed.clear();
   }
   

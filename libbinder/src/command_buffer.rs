@@ -53,6 +53,9 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
   }
   
   pub fn exec(&mut self, mut return_buf: Option<&mut ReturnBuffer<'binder>>) {
+    if let Some(buf) = return_buf {
+      buf.clear();
+    }
     let read_buf = return_buf.as_mut().map(|x| x.buffer.as_mut_slice()).unwrap_or(&mut []);
     let (bytes_written, bytes_read) = binder_read_write(self.binder_dev, &self.buffer, read_buf).unwrap();
     println!("Bytes sent {bytes_written}, Bytes received {bytes_read}");
