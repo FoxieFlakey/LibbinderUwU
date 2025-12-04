@@ -1,10 +1,13 @@
 use std::{fmt::Write, fs::File, os::fd::AsFd};
 
-use libbinder_raw::{BINDER_COMPILED_VERSION, Command, ObjectRefLocal, ObjectRefRemote, TransactionDataCommon, TransactionFlag, TransactionNotKernelMananged, binder_read_write, binder_set_context_mgr, binder_version};
+use enumflags2::BitFlags;
+use libbinder_raw::{BINDER_COMPILED_VERSION, ObjectRef, ObjectRefLocal, ObjectRefRemote, binder_set_context_mgr, binder_version};
+
+use crate::packet::builder::PacketBuilder;
 
 mod packet;
 
-fn hexdump(bytes: &[u8]) {
+pub fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<64>();
   fn dump(bytes: &[u8]) {
     let mut serialized = String::new();
@@ -31,32 +34,11 @@ fn main() {
   };
   binder_set_context_mgr(binder_dev.as_fd(), &context_mgr).unwrap();
   
-  let mut commands = Vec::<u8>::new();
-  let mut response = Vec::<u8>::new();
-  response.resize_with(100, || 0);
-  commands.extend_from_slice(&Command::EnterLooper.as_bytes());
-  commands.extend_from_slice(&Command::ExitLooper.as_bytes());
-  
-  let data = TransactionNotKernelMananged {
-    data: TransactionDataCommon {
-      code: 0,
-      data_slice: &[],
-      offsets: &[],
-      flags: TransactionFlag::OneWay.into(),
-      target: libbinder_raw::ObjectRef::Remote(ObjectRefRemote { data_handle: 0})
-    },
-  };
-  
-  data.with_bytes(|bytes| {
-    commands.extend_from_slice(&Command::SendTransaction.as_bytes());
-    commands.extend_from_slice(bytes);
-  });
-  
-  let (_, written_in_read) = binder_read_write(binder_dev.as_fd(), &commands, &mut response).unwrap();
-  println!("Bytes read: {written_in_read}");
-  hexdump(&response[..written_in_read]);
-  
-  drop(data);
+  PacketBuilder::new()
+    .set_binder_dev(binder_dev.as_fd())
+    .set_code(0)
+    .set_flags(BitFlags::empty())
+    .set_target(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }))
+    .build()
+    .send();
 }
-
-

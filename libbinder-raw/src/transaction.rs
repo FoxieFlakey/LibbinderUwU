@@ -13,6 +13,31 @@ pub enum Transaction<'binder, 'buffer, 'buffer_offsets> {
   KernelManaged(TransactionKernelManaged<'binder>)
 }
 
+impl<'buffer, 'buffer_offsets> Transaction<'_, 'buffer, 'buffer_offsets> {
+  pub fn with_bytes<F: FnOnce(&[u8]) -> R, R>(&self, func: F) -> R {
+    match self {
+      Self::NotKernelManaged(x) => x.with_bytes(func),
+      Self::KernelManaged(x) => x.with_bytes(func)
+    }
+  }
+  
+  pub fn with_common_mut<F, R>(&mut self, func: F) -> R
+    where F: FnOnce(&mut TransactionDataCommon) -> R
+  {
+    match self {
+      Self::KernelManaged(x) => x.with_data_mut(func),
+      Self::NotKernelManaged(x) => func(&mut x.data)
+    }
+  }
+  
+  pub fn get_common<'a: 'buffer + 'buffer_offsets>(&'a self) -> &'a TransactionDataCommon<'buffer, 'buffer_offsets> {
+    match self {
+      Self::KernelManaged(x) => x.get_data(),
+      Self::NotKernelManaged(x) => &x.data
+    }
+  }
+}
+
 pub struct TransactionDataCommon<'buf, 'buf_offsets> {
   pub target: ObjectRef,
   pub flags: BitFlags<TransactionFlag>,

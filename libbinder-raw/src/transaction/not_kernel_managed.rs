@@ -26,7 +26,8 @@ impl TransactionNotKernelMananged<'_, '_> {
       code: self.data.code,
       data: DataUnion {
         ptr: BufferStruct {
-          buffer: 0, offsets: 0
+          buffer: self.data.data_slice.as_ptr().addr(),
+          offsets: self.data.offsets.as_ptr().addr()
         }
       },
       extra_data,

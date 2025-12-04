@@ -2,7 +2,7 @@ use std::{mem::ManuallyDrop, os::fd::BorrowedFd, slice};
 
 use enumflags2::BitFlags;
 
-use crate::{BinderUsize, Command, ObjectRef, ObjectRefRemote, TransactionDataCommon, binder_read_write, transaction::TransactionDataRaw};
+use crate::{BinderUsize, Command, ObjectRef, ObjectRefRemote, TransactionDataCommon, binder_read_write, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
 
 pub struct TransactionKernelManaged<'binder> {
   // Used by drop code
@@ -17,6 +17,55 @@ pub struct TransactionKernelManaged<'binder> {
 }
 
 impl<'binder> TransactionKernelManaged<'binder> {
+  // Note: We placed fake empty slices, which will be restored
+  // don't change the slices. That is to ensure references to
+  // buffer don't escape as 'static well just a placeholder
+  //
+  // To meaning "dynamic lifetime" bound to kernel's buffer that
+  // will be free'd later. I could use 'yoke' but it ended up
+  // becoming more complicated than necessary
+  pub fn with_data_mut<F: FnOnce(&mut TransactionDataCommon<'static, 'static>) -> R, R>(&mut self, func: F) -> R {
+    let (buffer_slice_saved, offsets_slice_saved) = (self.data.data_slice, self.data.offsets);
+    self.data.data_slice = &[];
+    self.data.offsets = &[];
+    
+    let ret = func(&mut self.data);
+    
+    self.data.data_slice = buffer_slice_saved;
+    self.data.offsets = offsets_slice_saved;
+    return ret;
+  }
+  
+  pub fn with_bytes<F: FnOnce(&[u8]) -> R, R>(&self, func: F) -> R {
+    let raw = self.as_raw();
+    let bytes = bytemuck::bytes_of(&raw);
+    func(bytes)
+  }
+  
+  fn as_raw(&self) -> TransactionDataRaw {
+    let (target, extra_data) = match &self.data.target {
+      ObjectRef::Local(x) => (BinderOrHandleUnion { binder: x.data }, x.extra_data),
+      ObjectRef::Remote(x) => (BinderOrHandleUnion { handle: x.data_handle }, 0)
+    };
+    
+    TransactionDataRaw {
+      data_size: self.data.data_slice.len(),
+      offsets_size: self.data.offsets.len(),
+      sender_pid: 0,
+      sender_uid: 0,
+      flags: self.data.flags.bits(),
+      code: self.data.code,
+      data: DataUnion {
+        ptr: BufferStruct {
+          buffer: self.data.data_slice.as_ptr().addr(),
+          offsets: self.data.offsets.as_ptr().addr()
+        }
+      },
+      extra_data,
+      target
+    }
+  }
+  
   pub fn get_data<'a>(&'a self) -> &'a TransactionDataCommon<'a, 'a> {
     &self.data
   }
