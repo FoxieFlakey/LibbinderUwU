@@ -151,7 +151,7 @@ impl<'binder> Packet<'binder> {
         match val {
           ReturnValue::Noop => (),
           ReturnValue::Reply(reply) => {
-            if mem::replace(&mut latest_reply, Some(Some(reply.clone()))).is_none() {
+            if mem::replace(&mut latest_reply, Some(Some(reply.clone()))).is_some() {
               panic!("There were multiple responses to one transaction");
             }
           },
@@ -162,7 +162,7 @@ impl<'binder> Packet<'binder> {
             cant_be_sent = true;
           }
           ReturnValue::TransactionComplete => {
-            if mem::replace(&mut latest_reply, Some(None)).is_none() {
+            if mem::replace(&mut latest_reply, Some(None)).is_some() {
               panic!("There were multiple responses to one transaction");
             }
           },
