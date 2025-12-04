@@ -14,7 +14,7 @@ mod common;
 use common::log;
 
 pub fn hexdump(bytes: &[u8]) {
-  let (chunks, remainder) = bytes.as_chunks::<64>();
+  let (chunks, remainder) = bytes.as_chunks::<32>();
   fn dump(bytes: &[u8]) {
     let mut serialized = String::new();
     for byte in bytes {
