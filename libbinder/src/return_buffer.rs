@@ -9,7 +9,7 @@ pub enum ReturnValue<'binder> {
   Reply(Packet<'binder>),
   TransactionFailed,
   Ok,
-  Error(#[expect(unused)] i32),
+  Error(i32),
   SpawnLooper,
   TransactionComplete,
   DeadReply,

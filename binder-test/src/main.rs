@@ -5,15 +5,12 @@ use std::{fmt::Write, fs::File, os::fd::{AsFd, AsRawFd}, process::exit, ptr};
 use libbinder_raw::{BINDER_COMPILED_VERSION, binder_version};
 use nix::{libc, sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
-mod packet;
-mod process_sync;
-mod server;
-mod client;
-mod common;
-mod command_buffer;
-mod return_buffer;
-
 use common::log;
+
+mod client;
+mod server;
+mod common;
+mod process_sync;
 
 pub fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<32>();
@@ -79,3 +76,4 @@ fn main() {
   
   log!("Done");
 }
+

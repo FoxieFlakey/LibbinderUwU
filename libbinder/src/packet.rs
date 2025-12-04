@@ -104,7 +104,6 @@ impl<'binder> Packet<'binder> {
     });
   }
   
-  #[expect(unused)]
   pub fn set_flags(&mut self, flags: BitFlags<TransactionFlag>) {
     self.transaction.with_common_mut(|common| {
       common.flags = flags;

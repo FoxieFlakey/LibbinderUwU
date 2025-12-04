@@ -6,11 +6,9 @@ use crate::return_buffer::ReturnBuffer;
 
 pub enum Command<'binder, 'data> {
   EnterLooper,
-  #[expect(unused)]
   ExitLooper,
   SendTransaction(Transaction<'binder, 'data, 'data>),
   SendReply(Transaction<'binder, 'data, 'data>),
-  #[expect(unused)]
   RegisterLooper
 }
 
@@ -63,7 +61,6 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
     }
   }
   
-  #[expect(unused)]
   pub fn clear<'new_data>(self) -> CommandBuffer<'binder, 'new_data> {
     CommandBuffer {
       binder_dev: self.binder_dev,
