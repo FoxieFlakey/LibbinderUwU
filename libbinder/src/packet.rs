@@ -1,7 +1,7 @@
 use std::os::fd::BorrowedFd;
 
 use enumflags2::BitFlags;
-use libbinder_raw::{ObjectRef, Transaction, TransactionFlag};
+use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
 
 use crate::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder};
 
@@ -56,6 +56,38 @@ impl<'binder> Into<PacketBuilder<'binder>> for Packet<'binder> {
 }
 
 impl<'binder> Packet<'binder> {
+  // SAFETY: The 'bytes' has to be from kernel from the correct binder_dev
+  // and the bytes assumed to be from BR_TRANSACTION/BR_REPLY
+  //
+  // The 'bytes' alignment can be unaligned, and its fine
+  //
+  // For more accurate one see libbinder-raw/src/transaction/kernel_managed.rs
+  //
+  // The .0 is Some, incase its not a reply and indicates which object the transaction
+  // acted on
+  #[expect(unused)]
+  pub(crate) unsafe fn from_bytes(binder_dev: BorrowedFd<'binder>, bytes: &[u8], is_reply: bool) -> (Option<ObjectRefLocal>, Self) {
+    // SAFETY: Caller met the requirement
+    let transaction = Transaction::KernelManaged(unsafe { TransactionKernelManaged::from_bytes(binder_dev, bytes, is_reply) });
+    
+    (
+      if is_reply {
+        None
+      } else if let ObjectRef::Local(reference) = transaction.get_common().target.clone() {
+        Some(reference)
+      } else {
+        panic!("BR_TRANSACTION returns remote reference!");
+      },
+      
+      Self {
+        binder_dev,
+        data_buffer: Vec::new(),
+        offset_buffer: Vec::new(),
+        transaction
+      }
+    )
+  }
+  
   #[expect(unused)]
   pub fn set_code(&mut self, code: u32) {
     self.transaction.with_common_mut(|common| {
@@ -79,7 +111,7 @@ impl<'binder> Packet<'binder> {
     transaction.with_common_mut(|x| x.target = target);
     CommandBuffer::new(self.binder_dev)
       .enqueue_command(Command::SendTransaction(transaction))
-      .exec();
+      .exec(None);
     todo!();
   }
 }
