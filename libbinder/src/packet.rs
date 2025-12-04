@@ -1,4 +1,4 @@
-use std::os::fd::BorrowedFd;
+use std::{mem, os::fd::BorrowedFd};
 
 use enumflags2::BitFlags;
 use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
@@ -56,6 +56,16 @@ impl<'binder> Into<PacketBuilder<'binder>> for Packet<'binder> {
   }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum PacketSendError {
+  // Transaction cannot be sent to target
+  Failed,
+  
+  // Transaction did sent to target, but
+  // it died before sending reply
+  DeadTarget
+}
+
 impl<'binder> Packet<'binder> {
   // SAFETY: The 'bytes' has to be from kernel from the correct binder_dev
   // and the bytes assumed to be from BR_TRANSACTION/BR_REPLY
@@ -111,7 +121,9 @@ impl<'binder> Packet<'binder> {
       .exec(Some(&mut ReturnBuffer::new(self.binder_dev, 4096)));
   }
   
-  pub fn send(&self, target: ObjectRef) {
+  // If the transaction doesn't result anything. None is retured
+  // else error if there error
+  pub fn send(&self, target: ObjectRef) -> Result<Option<Packet<'binder>>, PacketSendError> {
     if matches!(target, ObjectRef::Local(_)) {
       todo!("Handle local transaction");
     }
@@ -129,6 +141,9 @@ impl<'binder> Packet<'binder> {
     CommandBuffer::new(self.binder_dev)
       .exec(Some(&mut ret_buf));
     
+    let mut latest_reply = None;
+    let mut is_dead = false;
+    let mut cant_be_sent = false;
     ret_buf.get_parsed()
       .iter()
       .rev()
@@ -136,15 +151,32 @@ impl<'binder> Packet<'binder> {
         match val {
           ReturnValue::Noop => (),
           ReturnValue::Reply(reply) => {
-            // Got a reply
-            crate::common::log!("got reply of code {}", reply.get_code());
+            if mem::replace(&mut latest_reply, Some(Some(reply.clone()))).is_none() {
+              panic!("There were multiple responses to one transaction");
+            }
           },
+          ReturnValue::DeadReply => {
+            is_dead = true;
+          }
+          ReturnValue::TransactionFailed => {
+            cant_be_sent = true;
+          }
           ReturnValue::TransactionComplete => {
-            crate::common::log!("Transaction completed (no reply data)");
+            if mem::replace(&mut latest_reply, Some(None)).is_none() {
+              panic!("There were multiple responses to one transaction");
+            }
           },
           _ => panic!("unhandled")
         }
       });
+    
+    match (latest_reply, is_dead, cant_be_sent) {
+      (Some(reply), false, false) => Ok(reply),
+      (None, true, false) => Err(PacketSendError::DeadTarget),
+      (None, false, true) => Err(PacketSendError::Failed),
+      (None, false, false) => panic!("did not get any response for transaction from kernel"),
+      _ => panic!("ambigious condition")
+    }
   }
 }
 
