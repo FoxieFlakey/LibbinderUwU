@@ -49,8 +49,10 @@ impl<'binder> Packet<'binder> {
       todo!("Handle local transaction");
     }
     
+    let mut transaction = self.transaction.clone();
+    transaction.with_common_mut(|x| x.target = target);
     CommandBuffer::new(self.binder_dev)
-      .enqueue_command(Command::SendTransaction(self.transaction.clone()))
+      .enqueue_command(Command::SendTransaction(transaction))
       .exec();
     todo!();
   }
