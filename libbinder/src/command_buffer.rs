@@ -1,6 +1,7 @@
 use std::{marker::PhantomData, os::fd::BorrowedFd};
 
 use libbinder_raw::{Command as CommandRaw, Transaction, binder_read_write};
+use nix::errno::Errno;
 
 use crate::return_buffer::ReturnBuffer;
 
@@ -53,8 +54,25 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
     if let Some(buf) = return_buf.as_mut() {
       buf.clear();
     }
-    let read_buf = return_buf.as_mut().map(|x| x.buffer.as_mut_slice()).unwrap_or(&mut []);
-    let (bytes_written, bytes_read) = binder_read_write(self.binder_dev, &self.buffer, read_buf).unwrap();
+    let mut write_buf = self.buffer.as_slice();
+    let mut read_buf = return_buf.as_mut().map(|x| x.buffer.as_mut_slice()).unwrap_or(&mut []);
+    let bytes_written;
+    let bytes_read;
+    
+    loop {
+      match binder_read_write(self.binder_dev, write_buf, read_buf) {
+        Ok(x) => {
+          (bytes_written, bytes_read) = x;
+          break;
+        }
+        Err((Errno::EINTR, (bytes_written, bytes_read))) => {
+          write_buf = &write_buf[bytes_written..];
+          read_buf = &mut read_buf[bytes_read..];
+        }
+        _ => ()
+      }
+    }
+    
     assert!(bytes_written == self.buffer.len());
     if let Some(buf) = return_buf {
       buf.parse(bytes_read);

@@ -1,6 +1,7 @@
 use std::{os::fd::BorrowedFd, slice, sync::Arc};
 
 use enumflags2::BitFlags;
+use nix::errno::Errno;
 
 use crate::{BinderUsize, Command, ObjectRef, ObjectRefLocal, ObjectRefRemote, TransactionDataCommon, binder_read_write, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
 
@@ -16,7 +17,13 @@ impl Drop for KernelBuffer<'_> {
     commands.extend_from_slice(&Command::FreeBuffer.as_bytes());
     commands.extend_from_slice(&self.buffer_ptr.to_ne_bytes());
     
-    binder_read_write(self.binder_dev, &commands, &mut []).unwrap();
+    loop {
+      match binder_read_write(self.binder_dev, &commands, &mut []) {
+        Ok(_) => break,
+        Err((Errno::EINTR, _)) => (),
+        Err((e, _)) => panic!("Error freeing kernel buffer: {}", e)
+      }
+    }
   }
 }
 
