@@ -67,10 +67,10 @@ impl<'binder> ReturnBuffer<'binder> {
         ReturnVal::Ok => ReturnValue::Ok,
         ReturnVal::SpawnLooper => ReturnValue::SpawnLooper,
         ReturnVal::TransactionComplete => ReturnValue::TransactionComplete,
-        _ => panic!()
+        _ => panic!("Unimplemented: {:#?}", val_tag)
       };
       
-      println!("Ret[{:02}] {:#?}", self.parsed.len(), val_tag);
+      println!("{:8} Ret[{:02}] {:#?}", nix::unistd::getpid().as_raw(), self.parsed.len(), val_tag);
       
       // Go forward
       current = &current[RETVAL_SIZE..];

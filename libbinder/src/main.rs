@@ -50,8 +50,8 @@ fn main() {
   server::init();
   log!("Inited");
   
-  let server_pid = divide(|| server::run(&binder_dev));
-  let child_pid = divide(|| client::run(&binder_dev));
+  let server_pid = divide(|| server::run(&File::open("/dev/binder").unwrap()));
+  let child_pid = divide(|| client::run(&File::open("/dev/binder").unwrap()));
   
   log!("Waiting");
   
