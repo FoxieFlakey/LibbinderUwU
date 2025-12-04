@@ -2,7 +2,7 @@ use std::{os::fd::BorrowedFd, slice, sync::Arc};
 
 use enumflags2::BitFlags;
 
-use crate::{BinderUsize, Command, ObjectRef, ObjectRefRemote, TransactionDataCommon, binder_read_write, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
+use crate::{BinderUsize, Command, ObjectRef, ObjectRefLocal, ObjectRefRemote, TransactionDataCommon, binder_read_write, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
 
 struct KernelBuffer<'binder> {
   binder_dev: BorrowedFd<'binder>,
@@ -32,6 +32,8 @@ pub struct TransactionKernelManaged<'binder> {
   // the kernel buffer
   _kernel_buf: Arc<KernelBuffer<'binder>>
 }
+
+pub const BYTES_NEEDED_FOR_FROM_BYTES: usize = size_of::<TransactionDataRaw>();
 
 impl<'binder> TransactionKernelManaged<'binder> {
   // Note: We placed fake empty slices, which will be restored
@@ -91,9 +93,9 @@ impl<'binder> TransactionKernelManaged<'binder> {
   // and the bytes assumed to be from BR_TRANSACTION/BR_REPLY
   //
   // The 'bytes' alignment can be unaligned, and its fine
-  pub unsafe fn from_bytes(binder_dev: BorrowedFd<'binder>, bytes: &[u8]) -> Self {
-    if bytes.len() != size_of::<TransactionDataRaw>() {
-      panic!("Size of the 'bytes' is not same the size of binder_transaction_data ({} bytes)", size_of::<TransactionDataRaw>());
+  pub unsafe fn from_bytes(binder_dev: BorrowedFd<'binder>, bytes: &[u8], is_reply: bool) -> Self {
+    if bytes.len() != BYTES_NEEDED_FOR_FROM_BYTES {
+      panic!("Size of the 'bytes' is not same the size of binder_transaction_data ({} bytes)", BYTES_NEEDED_FOR_FROM_BYTES);
     }
     
     let temp;
@@ -112,7 +114,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
         &temp[offset..]
       };
     
-    assert!(aligned.len() == size_of::<TransactionDataRaw>());
+    assert!(aligned.len() == BYTES_NEEDED_FOR_FROM_BYTES);
     
     let raw = bytemuck::from_bytes::<TransactionDataRaw>(aligned);
     
@@ -128,9 +130,16 @@ impl<'binder> TransactionKernelManaged<'binder> {
       }),
       data: TransactionDataCommon {
         code: raw.code,
-        target: ObjectRef::Remote(ObjectRefRemote {
-          data_handle: unsafe { raw.target.handle },
-        }),
+        target: if is_reply {
+            ObjectRef::Remote(ObjectRefRemote {
+              data_handle: unsafe { raw.target.handle },
+            })
+          } else {
+            ObjectRef::Local(ObjectRefLocal {
+              data: unsafe { raw.target.binder },
+              extra_data: raw.extra_data
+            })
+          },
         flags: BitFlags::from_bits(raw.flags).ok().unwrap(),
         data_slice,
         offsets
