@@ -76,8 +76,6 @@ impl<'binder> ReturnBuffer<'binder> {
         _ => panic!("Unimplemented: {:#?}", val_tag)
       };
       
-      println!("{:8} Ret[{:02}] {:#?}", nix::unistd::getpid().as_raw(), self.parsed.len(), val_tag);
-      
       // Go forward
       current = &current[RETVAL_SIZE..];
       self.parsed.push(val);
