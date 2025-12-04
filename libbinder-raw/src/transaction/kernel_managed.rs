@@ -109,9 +109,9 @@ impl<'binder> TransactionKernelManaged<'binder> {
           } else {
             aligned.as_ptr().addr().next_multiple_of(align_of::<TransactionDataRaw>()) - aligned.as_ptr().addr()
           };
-        aligned[offset..].copy_from_slice(bytes);
+        aligned[offset..offset + BYTES_NEEDED_FOR_FROM_BYTES].copy_from_slice(bytes);
         temp = aligned;
-        &temp[offset..]
+        &temp[offset..BYTES_NEEDED_FOR_FROM_BYTES]
       };
     
     assert!(aligned.len() == BYTES_NEEDED_FOR_FROM_BYTES);
