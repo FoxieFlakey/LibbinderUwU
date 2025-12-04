@@ -65,7 +65,6 @@ impl<'binder> Packet<'binder> {
   //
   // The .0 is Some, incase its not a reply and indicates which object the transaction
   // acted on
-  #[expect(unused)]
   pub(crate) unsafe fn from_bytes(binder_dev: BorrowedFd<'binder>, bytes: &[u8], is_reply: bool) -> (Option<ObjectRefLocal>, Self) {
     // SAFETY: Caller met the requirement
     let transaction = Transaction::KernelManaged(unsafe { TransactionKernelManaged::from_bytes(binder_dev, bytes, is_reply) });

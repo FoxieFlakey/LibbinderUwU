@@ -60,9 +60,8 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
     let (bytes_written, bytes_read) = binder_read_write(self.binder_dev, &self.buffer, read_buf).unwrap();
     println!("Bytes sent {bytes_written}, Bytes received {bytes_read}");
     if let Some(buf) = return_buf {
-      buf.parse();
+      buf.parse(bytes_read);
     }
-    panic!();
   }
   
   #[expect(unused)]
