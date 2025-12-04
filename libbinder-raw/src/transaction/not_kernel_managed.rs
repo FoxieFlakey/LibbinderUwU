@@ -19,8 +19,8 @@ impl TransactionNotKernelMananged<'_, '_> {
     };
     
     TransactionDataRaw {
-      data_size: 0,
-      offsets_size: 0,
+      data_size: self.data.data_slice.len(),
+      offsets_size: self.data.offsets.len(),
       sender_pid: 0,
       sender_uid: 0,
       flags: self.data.flags.bits(),
