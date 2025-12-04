@@ -10,9 +10,10 @@ const BINDER_CMD_MAGIC: u8 = b'c';
 pub enum Command {
   SendTransaction = request_code_write!(BINDER_CMD_MAGIC, 0, size_of::<TransactionDataRaw>()),
   SendReply = request_code_write!(BINDER_CMD_MAGIC, 1, size_of::<TransactionDataRaw>()),
+  FreeBuffer = request_code_none!(BINDER_CMD_MAGIC, 3),
+  RegisterLooper = request_code_none!(BINDER_CMD_MAGIC, 11),
   EnterLooper = request_code_none!(BINDER_CMD_MAGIC, 12),
-  ExitLooper = request_code_none!(BINDER_CMD_MAGIC, 13),
-  FreeBuffer = request_code_none!(BINDER_CMD_MAGIC, 3)
+  ExitLooper = request_code_none!(BINDER_CMD_MAGIC, 13)
 }
 
 impl Command {
@@ -27,10 +28,15 @@ const BINDER_RET_MAGIC: u8 = b'r';
 #[derive(Debug, Clone, Copy, TryFromPrimitive)]
 pub enum ReturnVal {
   Error = request_code_read!(BINDER_RET_MAGIC, 0, size_of::<i32>()),
-  Failed = request_code_none!(BINDER_RET_MAGIC, 17),
-  TransactionComplete = request_code_none!(BINDER_RET_MAGIC, 6),
   Ok = request_code_none!(BINDER_RET_MAGIC, 1),
-  Noop = request_code_none!(BINDER_RET_MAGIC, 12)
+  Transaction = request_code_read!(BINDER_RET_MAGIC, 2, size_of::<TransactionDataRaw>()),
+  Reply = request_code_read!(BINDER_RET_MAGIC, 3, size_of::<TransactionDataRaw>()),
+  DeadReply = request_code_none!(BINDER_RET_MAGIC, 5),
+  TransactionComplete = request_code_none!(BINDER_RET_MAGIC, 6),
+  Noop = request_code_none!(BINDER_RET_MAGIC, 12),
+  SpawnLooper = request_code_none!(BINDER_RET_MAGIC, 13),
+  DeadBinder = request_code_none!(BINDER_RET_MAGIC, 15),
+  Failed = request_code_none!(BINDER_RET_MAGIC, 17)
 }
 
 impl ReturnVal {
