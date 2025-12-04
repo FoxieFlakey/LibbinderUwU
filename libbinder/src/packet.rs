@@ -47,7 +47,7 @@ impl<'binder> Into<PacketBuilder<'binder>> for Packet<'binder> {
     };
     
     PacketBuilder {
-      binder_dev: Some(self.binder_dev),
+      binder_dev: self.binder_dev,
       code: Some(common.code),
       data_buffer: self.data_buffer,
       offsets_buffer: self.offset_buffer,

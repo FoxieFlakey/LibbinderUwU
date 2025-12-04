@@ -6,7 +6,7 @@ use libbinder_raw::{ObjectRef, ObjectRefRemote, Transaction, TransactionDataComm
 use crate::packet::Packet;
 
 pub struct PacketBuilder<'binder> {
-  pub(super) binder_dev: Option<BorrowedFd<'binder>>,
+  pub(super) binder_dev: BorrowedFd<'binder>,
   pub(super) code: Option<u32>,
   pub(super) flags: Option<BitFlags<TransactionFlag>>,
   pub(super) data_buffer: Vec<u8>,
@@ -14,13 +14,13 @@ pub struct PacketBuilder<'binder> {
 }
 
 impl<'binder> PacketBuilder<'binder> {
-  pub fn new() -> Self {
+  pub fn new(binder_dev: BorrowedFd<'binder>) -> Self {
     Self {
-      binder_dev: None,
       code: None,
       flags: None,
       data_buffer: Vec::new(),
-      offsets_buffer: Vec::new()
+      offsets_buffer: Vec::new(),
+      binder_dev
     }
   }
   
@@ -34,16 +34,11 @@ impl<'binder> PacketBuilder<'binder> {
     self
   }
   
-  pub fn set_binder_dev(&mut self, binder_dev: BorrowedFd<'binder>) -> &mut Self {
-    self.binder_dev = Some(binder_dev);
-    self
-  }
-  
   // After build the builder is 'reset'
   // to state where it starts
   pub fn build(&mut self) -> Packet<'binder> {
     Packet {
-      binder_dev: self.binder_dev.take().expect("binder_dev must be given to build a packet"),
+      binder_dev: self.binder_dev,
       transaction: Transaction::NotKernelManaged(TransactionNotKernelMananged {
         data: TransactionDataCommon {
           code: self.code.take().expect("code must be given to build a packet"),

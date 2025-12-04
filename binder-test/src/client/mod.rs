@@ -16,8 +16,7 @@ pub fn run(binder_dev: &File) {
   sleep(1);
   log!("Server ready");
   
-  PacketBuilder::new()
-    .set_binder_dev(binder_dev.as_fd())
+  PacketBuilder::new(binder_dev.as_fd())
     .set_code(8086)
     .build()
     .send(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }))
