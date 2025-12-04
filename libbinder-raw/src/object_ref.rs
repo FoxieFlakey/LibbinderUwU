@@ -59,7 +59,7 @@ pub struct ObjectRefLocal {
 
 #[derive(Clone)]
 pub struct ObjectRefRemote {
-  data_handle: u32
+  pub data_handle: u32
 }
 
 impl ObjectRefLocal {

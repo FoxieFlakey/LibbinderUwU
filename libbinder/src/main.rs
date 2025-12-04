@@ -1,6 +1,8 @@
 use std::{fmt::Write, fs::File, os::fd::AsFd};
 
-use libbinder_raw::{BINDER_COMPILED_VERSION, Command, ObjectRefLocal, TransactionDataCommon, TransactionFlag, TransactionToKernel, binder_read_write, binder_set_context_mgr, binder_version};
+use libbinder_raw::{BINDER_COMPILED_VERSION, Command, ObjectRefLocal, ObjectRefRemote, TransactionDataCommon, TransactionFlag, TransactionNotKernelMananged, binder_read_write, binder_set_context_mgr, binder_version};
+
+mod packet;
 
 fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<64>();
@@ -35,14 +37,14 @@ fn main() {
   commands.extend_from_slice(&Command::EnterLooper.as_bytes());
   commands.extend_from_slice(&Command::ExitLooper.as_bytes());
   
-  let data = TransactionToKernel {
+  let data = TransactionNotKernelMananged {
     data: TransactionDataCommon {
       code: 0,
       data_slice: &[],
       offsets: &[]
     },
     flags: TransactionFlag::OneWay.into(),
-    target: 0
+    target: libbinder_raw::ObjectRef::Remote(ObjectRefRemote { data_handle: 0})
   };
   
   data.with_bytes(|bytes| {

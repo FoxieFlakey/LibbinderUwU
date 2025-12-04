@@ -4,7 +4,7 @@ use std::{mem::ManuallyDrop, os::fd::BorrowedFd};
 use bytemuck::{Pod, Zeroable};
 use enumflags2::{BitFlags, bitflags};
 
-use crate::{BinderUsize, Command, binder_read_write};
+use crate::{BinderUsize, Command, ObjectRef, ObjectRefRemote, binder_read_write};
 
 pub enum Transaction<'binder, 'buffer, 'buffer_offsets> {
   NotKernelManaged(TransactionNotKernelMananged<'buffer, 'buffer_offsets>),
@@ -30,9 +30,7 @@ pub enum TransactionFlag {
 }
 
 pub struct TransactionNotKernelMananged<'buffer, 'buffer_offsets> {
-  // A transaction to kernel, targetting this
-  // object handle
-  pub target: u32,
+  pub target: ObjectRef,
   pub flags: BitFlags<TransactionFlag>,
   pub data: TransactionDataCommon<'buffer, 'buffer_offsets>
 }
@@ -45,33 +43,32 @@ impl TransactionNotKernelMananged<'_, '_> {
   }
   
   fn as_raw(&self) -> TransactionDataRaw {
+    let (target, extra_data) = match &self.target {
+      ObjectRef::Local(x) => (BinderOrHandleUnion { binder: x.data }, x.extra_data),
+      ObjectRef::Remote(x) => (BinderOrHandleUnion { handle: x.data_handle }, 0)
+    };
+    
     TransactionDataRaw {
-      target: BinderOrHandleUnion {
-        handle: self.target
-      },
       data_size: 0,
       offsets_size: 0,
       sender_pid: 0,
       sender_uid: 0,
-      extra_data: 0,
       flags: self.flags.bits(),
       code: self.data.code,
       data: DataUnion {
         ptr: BufferStruct {
           buffer: 0, offsets: 0
         }
-      }
+      },
+      extra_data,
+      target
     }
   }
 }
 
 pub struct TransactionKernelManaged<'binder> {
-  // A transaction from kernel targetting this object
-  pub object: usize,
+  pub object: ObjectRef,
   pub flags: BitFlags<TransactionFlag>,
-  
-  // Extra data associated with the object
-  pub extra_data: usize,
   
   // Used by drop code
   binder_dev: BorrowedFd<'binder>,
@@ -90,10 +87,10 @@ impl<'binder> TransactionKernelManaged<'binder> {
   }
   
   // SAFETY: The 'bytes' has to be from kernel from the correct binder_dev
-  // and received
+  // and the bytes assumed to be from BR_TRANSACTION
   //
   // The 'bytes' alignment can be unaligned, and its fine
-  pub unsafe fn from_bytes(&self, binder_dev: BorrowedFd<'binder>, bytes: &[u8]) -> Self {
+  pub unsafe fn from_bytes(binder_dev: BorrowedFd<'binder>, bytes: &[u8]) -> Self {
     if bytes.len() != size_of::<TransactionDataRaw>() {
       panic!("Size of the 'bytes' is not same the size of binder_transaction_data ({} bytes)", size_of::<TransactionDataRaw>());
     }
@@ -125,8 +122,9 @@ impl<'binder> TransactionKernelManaged<'binder> {
     
     Self {
       buffer_ptr: unsafe { raw.data.ptr.buffer },
-      extra_data: raw.extra_data,
-      object: unsafe { raw.target.binder },
+      object: ObjectRef::Remote(ObjectRefRemote {
+        data_handle: unsafe { raw.target.handle },
+      }),
       flags: BitFlags::from_bits(raw.flags).ok().unwrap(),
       data: ManuallyDrop::new(TransactionDataCommon {
         code: raw.code,
