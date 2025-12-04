@@ -1,11 +1,17 @@
-use std::{fmt::Write, fs::File, os::fd::AsFd};
+#![feature(never_type)]
 
-use enumflags2::BitFlags;
-use libbinder_raw::{BINDER_COMPILED_VERSION, ObjectRef, ObjectRefLocal, ObjectRefRemote, binder_set_context_mgr, binder_version};
+use std::{fmt::Write, fs::File, os::fd::AsFd, process::exit};
 
-use crate::packet::builder::PacketBuilder;
+use libbinder_raw::{BINDER_COMPILED_VERSION, binder_version};
+use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
 mod packet;
+mod process_sync;
+mod server;
+mod client;
+mod common;
+
+use common::log;
 
 pub fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<64>();
@@ -23,22 +29,32 @@ pub fn hexdump(bytes: &[u8]) {
   dump(remainder);
 }
 
+fn divide<F: FnOnce()>(on_child: F) -> Pid {
+  match unsafe { fork() }.unwrap() {
+    ForkResult::Child => {
+      on_child();
+      exit(0);
+    },
+    ForkResult::Parent { child } => child
+  }
+}
+
 fn main() {
   let binder_dev = File::open("/dev/binder").unwrap();
   let ver = binder_version(binder_dev.as_fd()).unwrap();
   println!("Binder version on kernel is {} while libkernel compiled for {}", ver.version, BINDER_COMPILED_VERSION.version);
   
-  let context_mgr = ObjectRefLocal {
-    data: 0,
-    extra_data: 0
-  };
-  binder_set_context_mgr(binder_dev.as_fd(), &context_mgr).unwrap();
+  client::init();
+  server::init();
+  log!("Inited");
   
-  PacketBuilder::new()
-    .set_binder_dev(binder_dev.as_fd())
-    .set_code(0)
-    .set_flags(BitFlags::empty())
-    .set_target(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }))
-    .build()
-    .send();
+  let server_pid = divide(|| server::run(&binder_dev));
+  let child_pid = divide(|| client::run(&binder_dev));
+  
+  log!("Waiting");
+  
+  waitpid(server_pid, None).unwrap();
+  waitpid(child_pid, None).unwrap();
+  
+  log!("Done");
 }

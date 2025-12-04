@@ -88,6 +88,8 @@ version = "0.1.0"
 dependencies = [
  "enumflags2",
  "libbinder-raw",
+ "nix",
+ "process-sync",
  "yoke",
 ]
 
@@ -164,6 +166,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ee95bc4ef87b8d5ba32e8b7714ccc834865276eab0aed5c9958d00ec45f49e8"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "process-sync"
+version = "0.2.2"
+source = "git+https://github.com/FoxieFlakey/process-sync-rs.git?rev=a96bcfd6db554e47020252b07d4478c9968f333d#a96bcfd6db554e47020252b07d4478c9968f333d"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
