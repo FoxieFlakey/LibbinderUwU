@@ -3,7 +3,7 @@ use std::os::fd::BorrowedFd;
 use enumflags2::BitFlags;
 use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
 
-use crate::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder};
+use crate::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder, return_buffer::ReturnBuffer};
 
 pub mod builder;
 
@@ -101,6 +101,10 @@ impl<'binder> Packet<'binder> {
     });
   }
   
+  pub fn get_code(&self) -> u32 {
+    self.transaction.get_common().code
+  }
+  
   pub fn send(&self, target: ObjectRef) -> Packet<'binder> {
     if matches!(target, ObjectRef::Local(_)) {
       todo!("Handle local transaction");
@@ -110,7 +114,7 @@ impl<'binder> Packet<'binder> {
     transaction.with_common_mut(|x| x.target = target);
     CommandBuffer::new(self.binder_dev)
       .enqueue_command(Command::SendTransaction(transaction))
-      .exec(None);
+      .exec(Some(&mut ReturnBuffer::new(self.binder_dev, 4096)));
     todo!();
   }
 }

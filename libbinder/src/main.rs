@@ -1,9 +1,9 @@
 #![feature(never_type)]
 
-use std::{fmt::Write, fs::File, os::fd::AsFd, process::exit};
+use std::{fmt::Write, fs::File, os::fd::{AsFd, AsRawFd}, process::exit, ptr};
 
 use libbinder_raw::{BINDER_COMPILED_VERSION, binder_version};
-use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
+use nix::{libc, sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
 mod packet;
 mod process_sync;
@@ -41,6 +41,25 @@ fn divide<F: FnOnce()>(on_child: F) -> Pid {
   }
 }
 
+fn common_prep_binder() -> File {
+  let binder = File::open("/dev/binder").unwrap();
+  let fd = binder.as_raw_fd();
+  // Binder need this for storing transactions buffer
+  let ret = unsafe {
+    libc::mmap(
+      ptr::null_mut(),
+      8 * 1024 * 1024,
+      libc::PROT_READ,
+      libc::MAP_PRIVATE,
+      fd,
+      0
+    )
+  };
+  
+  assert!(ret != libc::MAP_FAILED);
+  binder
+}
+
 fn main() {
   let binder_dev = File::open("/dev/binder").unwrap();
   let ver = binder_version(binder_dev.as_fd()).unwrap();
@@ -50,8 +69,8 @@ fn main() {
   server::init();
   log!("Inited");
   
-  let server_pid = divide(|| server::run(&File::open("/dev/binder").unwrap()));
-  let child_pid = divide(|| client::run(&File::open("/dev/binder").unwrap()));
+  let server_pid = divide(|| server::run(&common_prep_binder()));
+  let child_pid = divide(|| client::run(&common_prep_binder()));
   
   log!("Waiting");
   

@@ -17,7 +17,7 @@ pub fn run(binder_dev: &File) {
   
   PacketBuilder::new()
     .set_binder_dev(binder_dev.as_fd())
-    .set_code(0)
+    .set_code(8086)
     .build()
     .send(ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }));
   

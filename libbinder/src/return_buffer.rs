@@ -5,7 +5,7 @@ use libbinder_raw::{BYTES_NEEDED_FOR_FROM_BYTES, ObjectRefLocal, ReturnVal};
 use crate::packet::Packet;
 
 pub enum ReturnValue<'binder> {
-  Transaction(#[expect(unused)] (ObjectRefLocal, Packet<'binder>)),
+  Transaction((ObjectRefLocal, Packet<'binder>)),
   Reply(#[expect(unused)] Packet<'binder>),
   TransactionFailed,
   Ok,
@@ -33,6 +33,10 @@ impl<'binder> ReturnBuffer<'binder> {
       parsed: Vec::new(),
       binder_dev
     }
+  }
+  
+  pub fn get_parsed(&self) -> &[ReturnValue<'binder>] {
+    &self.parsed
   }
   
   pub fn clear(&mut self) {

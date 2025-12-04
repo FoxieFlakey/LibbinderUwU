@@ -2,7 +2,7 @@ use std::{fs::File, os::fd::AsFd, sync::LazyLock};
 
 use libbinder_raw::{ObjectRefLocal, binder_set_context_mgr};
 
-use crate::{command_buffer::{Command, CommandBuffer}, common::log, process_sync::shared_completion::SharedCompletion, return_buffer::ReturnBuffer};
+use crate::{command_buffer::{Command, CommandBuffer}, common::log, process_sync::shared_completion::SharedCompletion, return_buffer::{ReturnBuffer, ReturnValue}};
 
 pub static SERVER_READY: LazyLock<SharedCompletion> = LazyLock::new(SharedCompletion::new);
 
@@ -27,6 +27,16 @@ pub fn run(binder_dev: &File) {
   
   let mut ret_buf = ReturnBuffer::new(binder_dev.as_fd(), 4096);
   CommandBuffer::new(binder_dev.as_fd()).exec(Some(&mut ret_buf));
+  ret_buf.get_parsed()
+    .iter()
+    .for_each(|ret| {
+      if let ReturnValue::Transaction((_, packet)) = ret {
+        println!("Incoming transaction! code {}", packet.get_code());
+      } else if !matches!(ret, ReturnValue::Noop) {
+        panic!("Unknown");
+      }
+    });
+  
   log!("Server stopped");
 }
 
