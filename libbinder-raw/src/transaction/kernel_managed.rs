@@ -103,7 +103,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
         bytes
       } else {
         let mut aligned = Vec::<u8>::new();
-        aligned.reserve_exact(bytes.len() + align_of::<TransactionDataRaw>());
+        aligned.resize(bytes.len() + align_of::<TransactionDataRaw>(), 0);
         let offset = if aligned.as_ptr().addr().is_power_of_two() {
             0
           } else {
