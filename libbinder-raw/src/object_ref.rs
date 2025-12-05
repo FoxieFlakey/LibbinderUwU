@@ -62,6 +62,8 @@ pub struct ObjectRefRemote {
   pub data_handle: u32
 }
 
+pub const CONTEXT_MANAGER_REF: ObjectRefRemote = ObjectRefRemote { data_handle: 0 };
+
 impl ObjectRefLocal {
   pub(crate) fn into_raw(&self) -> ObjectRefRaw {
     ObjectRefRaw {

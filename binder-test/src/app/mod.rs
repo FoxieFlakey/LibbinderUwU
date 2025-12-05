@@ -1,5 +1,5 @@
 use libbinder::formats::dead_simple::DeadSimpleFormatReader;
-use libbinder_raw::ObjectRefRemote;
+use libbinder_raw::CONTEXT_MANAGER_REF;
 use libbinder_runtime::Runtime;
 
 use crate::common::log;
@@ -9,7 +9,7 @@ pub fn main() {
   nix::unistd::sleep(1);
   
   let response = runtime.send_packet(
-      ObjectRefRemote { data_handle: 0 },
+      CONTEXT_MANAGER_REF,
       &runtime.new_packet()
         .set_code(80386)
         .build()
