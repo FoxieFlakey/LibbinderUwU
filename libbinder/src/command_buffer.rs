@@ -115,7 +115,7 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
   
   // Same as exec but will always block, and do poll as necessary
   pub fn exec_always_block(&mut self, return_buf: Option<&mut ReturnBuffer<'binder>>) -> Result<(), (usize, io::Error)> {
-    self.exec_impl(return_buf, None, false).map(|x| x.panic_if_blocking())
+    self.exec_impl(return_buf, None, true).map(|x| x.panic_if_blocking())
   }
   
   fn exec_impl(&mut self, mut return_buf: Option<&mut ReturnBuffer<'binder>>, resume_offset: Option<usize>, do_poll: bool) -> Result<ExecResult, (usize, io::Error)> {
