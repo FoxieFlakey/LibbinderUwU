@@ -1,14 +1,14 @@
 use std::{ffi::CStr, marker::PhantomData};
 
-use crate::{formats::WriteFormat, packet::{Packet, builder::PacketBuilder}};
+use crate::{formats::WriteFormat, packet::builder::PacketBuilder};
 
-pub struct Writer<'packet, 'binder: 'packet, Format: WriteFormat<'packet>> {
+pub struct Writer<'packet, Format: WriteFormat<'packet>> {
   format: Format,
-  _phantom: PhantomData<&'packet Packet<'binder>>
+  _phantom: PhantomData<&'packet ()>
 }
 
-impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Format> {
-  pub(crate) fn new(packet: &'packet mut PacketBuilder<'binder>, mut format: Format) -> Self {
+impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
+  pub(crate) fn new(packet: &'packet mut PacketBuilder, mut format: Format) -> Self {
     format.set_writer(Box::new(|bytes| packet.data_buffer.extend_from_slice(bytes)));
     
     Self {
@@ -38,7 +38,7 @@ macro_rules! impl_forward {
 }
 
 // The part to handle writes
-impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, '_, Format> {
+impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
   impl_forward!(write_u8, write_u8_array, write_u8_slice, u8);
   impl_forward!(write_u16, write_u16_array, write_u16_slice, u16);
   impl_forward!(write_u32, write_u32_array, write_u32_slice, u32);

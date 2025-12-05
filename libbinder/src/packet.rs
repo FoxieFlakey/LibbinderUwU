@@ -30,8 +30,8 @@ pub struct Packet<'binder> {
   pub(self) offset_buffer: Vec<usize>
 }
 
-impl<'binder> Into<PacketBuilder<'binder>> for Packet<'binder> {
-  fn into(mut self) -> PacketBuilder<'binder> {
+impl Into<PacketBuilder> for Packet<'_> {
+  fn into(mut self) -> PacketBuilder {
     let common = self.transaction.get_common();
     match &self.transaction {
       Transaction::KernelManaged(x) => {
@@ -49,7 +49,6 @@ impl<'binder> Into<PacketBuilder<'binder>> for Packet<'binder> {
     };
     
     PacketBuilder {
-      binder_dev: self.binder_dev,
       code: Some(common.code),
       data_buffer: self.data_buffer,
       offsets_buffer: self.offset_buffer,

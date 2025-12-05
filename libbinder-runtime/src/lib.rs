@@ -4,7 +4,7 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{io, os::fd::{AsFd, AsRawFd, OwnedFd}, sync::Arc, thread::{self, JoinHandle}};
+use std::{io, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::Arc, thread::{self, JoinHandle}};
 
 use closure::closure;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
@@ -82,8 +82,8 @@ impl Runtime {
     })
   }
   
-  pub fn new_packet<'a>(&'a self) -> PacketBuilder<'a> {
-    PacketBuilder::new(self.shared.binder_dev.as_fd())
+  pub fn get_binder<'a>(&'a self) -> BorrowedFd<'a> {
+    self.shared.binder_dev.as_fd()
   }
   
   pub fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a>) -> Result<Packet<'a>, PacketSendError> {
@@ -119,7 +119,7 @@ fn run_looper(shared: Arc<Shared>, shutdown_pipe_rd: OwnedFd, do_register: bool)
     .unwrap();
   
   let mut ret_buf = ReturnBuffer::new(binder_dev, 4096);
-  let mut reply_builder = PacketBuilder::new(shared.binder_dev.as_fd());
+  let mut reply_builder = PacketBuilder::new();
   'poll_loop: loop {
     let mut fds = [
       PollFd::new(shutdown_pipe_rd.as_fd(), PollFlags::POLLIN),
@@ -169,7 +169,7 @@ fn run_looper(shared: Arc<Shared>, shutdown_pipe_rd: OwnedFd, do_register: bool)
               
               obj.on_packet(&mock_runtime, &packet, &mut reply_builder);
               
-              let reply = reply_builder.build();
+              let reply = reply_builder.build(binder_dev);
               reply.send_as_reply().unwrap();
               reply_builder = reply.into();
             }

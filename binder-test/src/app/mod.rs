@@ -1,4 +1,4 @@
-use libbinder::formats::dead_simple::DeadSimpleFormatReader;
+use libbinder::{formats::dead_simple::DeadSimpleFormatReader, packet::builder::PacketBuilder};
 use libbinder_raw::CONTEXT_MANAGER_REF;
 use libbinder_runtime::Runtime;
 
@@ -10,9 +10,9 @@ pub fn main() {
   
   let response = runtime.send_packet(
       CONTEXT_MANAGER_REF,
-      &runtime.new_packet()
+      &PacketBuilder::new()
         .set_code(80386)
-        .build()
+        .build(runtime.get_binder())
     ).unwrap();
   
   assert!(response.get_code() == 7875);

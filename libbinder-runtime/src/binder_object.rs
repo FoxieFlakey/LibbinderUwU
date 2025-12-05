@@ -6,7 +6,7 @@ use libbinder_raw::ObjectRefLocal;
 use crate::Runtime;
 
 pub trait BinderObject: Sync + Send + 'static {
-  fn on_packet(&self, runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder<'_>);
+  fn on_packet(&self, runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder);
 }
 
 pub(crate) fn from_local_object_ref(object_ref: &ObjectRefLocal) -> *const dyn BinderObject {

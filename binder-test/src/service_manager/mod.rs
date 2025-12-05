@@ -6,7 +6,7 @@ use crate::common::log;
 struct ContextManager;
 
 impl BinderObject for ContextManager {
-  fn on_packet(&self, _runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder<'_>) {
+  fn on_packet(&self, _runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
     log!("Incoming transaction code: {}", packet.get_code());
     reply_builder.set_code(7875);
     
