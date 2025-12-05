@@ -21,6 +21,10 @@ impl<'writer> WriteFormat<'writer> for DeadSimpleFormat<'writer> {
     self.writer = Some(writer);
   }
   
+  fn get_writer(&mut self) -> &mut dyn FnMut(&[u8]) {
+    self.writer.as_mut().unwrap()
+  }
+  
   fn write_u8(&mut self, data: u8) {
     let writer = self.writer.as_mut().unwrap();
     writer(&data.to_ne_bytes());

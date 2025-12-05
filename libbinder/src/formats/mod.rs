@@ -8,6 +8,7 @@ pub mod dead_simple;
 pub trait WriteFormat<'writer> {
   // Set a writer to use
   fn set_writer(&mut self, writer: Box<dyn FnMut(&[u8]) + 'writer>);
+  fn get_writer(&mut self) -> &mut dyn FnMut(&[u8]);
   
   fn write_u8(&mut self, data: u8);
   fn write_u16(&mut self, data: u16);
