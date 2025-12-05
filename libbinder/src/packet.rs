@@ -1,7 +1,7 @@
 use std::{io, mem, os::fd::BorrowedFd};
 
 use enumflags2::BitFlags;
-use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
+use libbinder_raw::{ObjectRef, ObjectRefLocal, ObjectRefRemote, Transaction, TransactionFlag, TransactionKernelManaged};
 
 use crate::{command_buffer::{Command, CommandBuffer}, formats::ReadFormat, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
 
@@ -193,13 +193,9 @@ impl<'binder> Packet<'binder> {
   
   // If the transaction doesn't result anything. None is retured
   // else error if there error
-  pub fn send(&self, target: ObjectRef) -> Result<Packet<'binder>, PacketSendError> {
-    if matches!(target, ObjectRef::Local(_)) {
-      todo!("Handle local transaction");
-    }
-    
+  pub fn send(&self, target: ObjectRefRemote) -> Result<Packet<'binder>, PacketSendError> {
     let mut transaction = self.transaction.clone();
-    transaction.with_common_mut(|x| x.target = target);
+    transaction.with_common_mut(|x| x.target = ObjectRef::Remote(target));
     
     // Send transaction
     CommandBuffer::new(self.binder_dev)

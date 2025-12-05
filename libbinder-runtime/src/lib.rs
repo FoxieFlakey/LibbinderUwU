@@ -8,7 +8,7 @@ use std::{io, os::fd::{AsFd, AsRawFd, OwnedFd}, sync::Arc, thread::{self, JoinHa
 
 use closure::closure;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
-use libbinder_raw::{ObjectRef, binder_set_context_mgr};
+use libbinder_raw::{ObjectRefRemote, binder_set_context_mgr};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
 use crate::{binder_object::BinderObject, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
@@ -86,7 +86,7 @@ impl Runtime {
     PacketBuilder::new(self.shared.binder_dev.as_fd())
   }
   
-  pub fn send_packet<'a>(&'a self, target: ObjectRef, packet: &Packet<'a>) -> Result<Packet<'a>, PacketSendError> {
+  pub fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a>) -> Result<Packet<'a>, PacketSendError> {
     assert!(self.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
     packet.send(target)
   }
