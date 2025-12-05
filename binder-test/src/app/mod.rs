@@ -1,3 +1,4 @@
+use libbinder::formats::dead_simple::DeadSimpleFormatReader;
 use libbinder_raw::{ObjectRef, ObjectRefRemote};
 use libbinder_runtime::Runtime;
 
@@ -16,7 +17,7 @@ pub fn main() {
   
   assert!(response.get_code() == 7875);
   
-  let mut reader = response.reader();
+  let mut reader = response.reader(DeadSimpleFormatReader::new());
   log!("Read f64: {}", reader.read_f64().unwrap());
   log!("Read f32: {}", reader.read_f32().unwrap());
   log!("Read u32: {}", reader.read_u32().unwrap());

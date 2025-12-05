@@ -3,7 +3,7 @@ use std::{io, mem, os::fd::BorrowedFd};
 use enumflags2::BitFlags;
 use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
 
-use crate::{command_buffer::{Command, CommandBuffer}, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
+use crate::{command_buffer::{Command, CommandBuffer}, formats::ReadFormat, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
 
 pub mod builder;
 pub mod reader;
@@ -103,8 +103,8 @@ impl<'binder> Packet<'binder> {
     )
   }
   
-  pub fn reader<'packet>(&'packet self) -> Reader<'packet, 'binder> {
-    Reader::new(self)
+  pub fn reader<'packet, Format: ReadFormat<'packet>>(&'packet self, format: Format) -> Reader<'packet, Format> {
+    Reader::new(self, format)
   }
   
   pub fn set_code(&mut self, code: u32) {
