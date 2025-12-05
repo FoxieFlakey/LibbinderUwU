@@ -12,7 +12,7 @@ mod commands;
 mod transaction;
 
 pub use object_ref::{ObjectRefRemote, ObjectRefLocal, ObjectRefFlags, ObjectRef, CONTEXT_MANAGER_REF};
-pub use commands::{Command, ReturnVal};
+pub use commands::{Command, ReturnVal, PtrCookieRaw};
 pub use transaction::{TransactionDataCommon, TransactionKernelManaged, TransactionNotKernelMananged, TransactionFlag, Transaction, BYTES_NEEDED_FOR_FROM_BYTES};
 pub use write_read::binder_read_write;
 

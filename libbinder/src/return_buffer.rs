@@ -1,11 +1,15 @@
 use std::os::fd::BorrowedFd;
 
-use libbinder_raw::{BYTES_NEEDED_FOR_FROM_BYTES, ObjectRefLocal, ReturnVal};
+use libbinder_raw::{BYTES_NEEDED_FOR_FROM_BYTES, ObjectRefLocal, PtrCookieRaw, ReturnVal};
 
 use crate::packet::Packet;
 
 pub enum ReturnValue<'binder> {
   Transaction((ObjectRefLocal, Packet<'binder>)),
+  Acquire(ObjectRefLocal),
+  AcquireWeak(ObjectRefLocal),
+  Release(ObjectRefLocal),
+  ReleaseWeak(ObjectRefLocal),
   Reply(Packet<'binder>),
   TransactionFailed,
   Ok,
@@ -73,7 +77,39 @@ impl<'binder> ReturnBuffer<'binder> {
         ReturnVal::SpawnLooper => ReturnValue::SpawnLooper,
         ReturnVal::TransactionComplete => ReturnValue::TransactionComplete,
         ReturnVal::DeadReply => ReturnValue::DeadReply,
-        _ => panic!("Unimplemented: {:#?}", val_tag)
+        ReturnVal::DeadBinder => unimplemented!(),
+        ReturnVal::Acquire => {
+          let ret = PtrCookieRaw::from_raw_bytes(&current[..size_of::<PtrCookieRaw>()]);
+          current = &current[size_of::<PtrCookieRaw>()..];
+          ReturnValue::Acquire(ObjectRefLocal {
+            data: ret.ptr,
+            extra_data: ret.cookie
+          })
+        }
+        ReturnVal::Release => {
+          let ret = PtrCookieRaw::from_raw_bytes(&current[..size_of::<PtrCookieRaw>()]);
+          current = &current[size_of::<PtrCookieRaw>()..];
+          ReturnValue::Release(ObjectRefLocal {
+            data: ret.ptr,
+            extra_data: ret.cookie
+          })
+        }
+        ReturnVal::AcquireWeak => {
+          let ret = PtrCookieRaw::from_raw_bytes(&current[..size_of::<PtrCookieRaw>()]);
+          current = &current[size_of::<PtrCookieRaw>()..];
+          ReturnValue::AcquireWeak(ObjectRefLocal {
+            data: ret.ptr,
+            extra_data: ret.cookie
+          })
+        }
+        ReturnVal::ReleaseWeak => {
+          let ret = PtrCookieRaw::from_raw_bytes(&current[..size_of::<PtrCookieRaw>()]);
+          current = &current[size_of::<PtrCookieRaw>()..];
+          ReturnValue::ReleaseWeak(ObjectRefLocal {
+            data: ret.ptr,
+            extra_data: ret.cookie
+          })
+        }
       };
       
       // Go forward

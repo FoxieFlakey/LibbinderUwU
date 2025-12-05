@@ -1,3 +1,5 @@
+use std::mem;
+
 use nix::{request_code_none, request_code_read, request_code_write};
 use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 
@@ -24,6 +26,23 @@ impl Command {
 
 const BINDER_RET_MAGIC: u8 = b'r';
 
+#[repr(C)]
+pub struct PtrCookieRaw {
+  pub ptr: BinderUsize,
+  pub cookie: BinderUsize
+}
+
+impl PtrCookieRaw {
+  // Unaligned read does not matter
+  // any bit pattern is correct
+  pub fn from_raw_bytes(bytes: &[u8]) -> PtrCookieRaw {
+    let mut ret = [0u8; size_of::<PtrCookieRaw>()];
+    ret.copy_from_slice(bytes);
+    // All bit pattern of 'ret' is safe for PtrCookieRaw
+    unsafe { mem::transmute::<[u8; 16], PtrCookieRaw>(ret) }
+  }
+}
+
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, TryFromPrimitive)]
 pub enum ReturnVal {
@@ -36,7 +55,11 @@ pub enum ReturnVal {
   Noop = request_code_none!(BINDER_RET_MAGIC, 12),
   SpawnLooper = request_code_none!(BINDER_RET_MAGIC, 13),
   DeadBinder = request_code_none!(BINDER_RET_MAGIC, 15),
-  Failed = request_code_none!(BINDER_RET_MAGIC, 17)
+  Failed = request_code_none!(BINDER_RET_MAGIC, 17),
+  Acquire = request_code_read!(BINDER_RET_MAGIC, 8, size_of::<PtrCookieRaw>()),
+  AcquireWeak = request_code_read!(BINDER_RET_MAGIC, 7, size_of::<PtrCookieRaw>()),
+  Release = request_code_read!(BINDER_RET_MAGIC, 9, size_of::<PtrCookieRaw>()),
+  ReleaseWeak = request_code_read!(BINDER_RET_MAGIC, 10, size_of::<PtrCookieRaw>())
 }
 
 impl ReturnVal {
