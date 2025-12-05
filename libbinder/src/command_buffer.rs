@@ -89,8 +89,12 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
     self
   }
   
-  fn find_cmd_idx_from_bytes_written(&self, written_bytes: usize) -> usize {
-    self.commands_end_offsets.binary_search(&written_bytes).unwrap()
+  fn find_cmd_idx_from_bytes_written(&self, written_bytes: usize) -> Option<usize> {
+    if written_bytes == 0 {
+      return None;
+    }
+    
+    Some(self.commands_end_offsets.binary_search(&written_bytes).unwrap())
   }
   
   fn cmd_idx_to_buffer_idx(&self, idx: usize) -> usize {
@@ -169,7 +173,7 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
             buf.parse(bytes_read);
           }
           
-          let num_executed = self.find_cmd_idx_from_bytes_written(bytes_written + offset) + 1;
+          let num_executed = self.find_cmd_idx_from_bytes_written(bytes_written + offset).map(|x| x + 1).unwrap_or(0);
           if num_executed == self.commands_end_offsets.len() {
             return Ok(ExecResult::WouldBlockOnRead);
           } else {
@@ -181,7 +185,7 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
             buf.parse(bytes_read);
           }
           
-          return Err((self.find_cmd_idx_from_bytes_written(bytes_written + offset) + 1, e.into()));
+          return Err((self.find_cmd_idx_from_bytes_written(bytes_written + offset).map(|x| x + 1).unwrap_or(0), e.into()));
         }
       }
     }
