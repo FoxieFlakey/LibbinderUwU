@@ -1,4 +1,4 @@
-use std::{mem, os::fd::BorrowedFd};
+use std::{io, mem, os::fd::BorrowedFd};
 
 use enumflags2::BitFlags;
 use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
@@ -56,10 +56,13 @@ impl<'binder> Into<PacketBuilder<'binder>> for Packet<'binder> {
   }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum PacketSendError {
   // Transaction cannot be sent to target
   Failed,
+  
+  // Kernel sent an error
+  Error(io::Error),
   
   // Transaction did sent to target, but
   // it died before sending reply
@@ -114,31 +117,35 @@ impl<'binder> Packet<'binder> {
     self.transaction.get_common().code
   }
   
-  pub fn send_as_reply(&self) {
-    CommandBuffer::new(self.binder_dev)
-      .enqueue_command(Command::SendReply(self.transaction.clone()))
-      .exec(Some(&mut ReturnBuffer::new(self.binder_dev, 4096)));
+  pub fn get_binder_dev(&self) -> BorrowedFd<'binder> {
+    self.binder_dev
   }
   
-  // If the transaction doesn't result anything. None is retured
-  // else error if there error
-  pub fn send(&self, target: ObjectRef) -> Result<Packet<'binder>, PacketSendError> {
-    if matches!(target, ObjectRef::Local(_)) {
-      todo!("Handle local transaction");
-    }
-    
-    let mut transaction = self.transaction.clone();
-    let mut ret_buf = ReturnBuffer::new(self.binder_dev, 4096);
-    transaction.with_common_mut(|x| x.target = target);
-    
-    // Send transaction
+  pub fn send_as_reply(&self) -> Result<(), PacketSendError> {
+    // Send reply
     CommandBuffer::new(self.binder_dev)
-      .enqueue_command(Command::SendTransaction(transaction))
-      .exec(None);
+      .enqueue_command(Command::SendReply(self.transaction.clone()))
+      .exec_always_block(None)
+      .unwrap();
     
+    // Read reply result
+    let mut ret_buffer = ReturnBuffer::new(self.binder_dev, 64);
+    CommandBuffer::new(self.binder_dev)
+      .exec_always_block(Some(&mut ret_buffer))
+      .unwrap();
+    
+    self.handle_result()
+      .map(|x| {
+        assert!(x.is_none(), "kernel sent a reply for a reply, when not expected")
+      })
+  }
+  
+  fn handle_result(&self) -> Result<Option<Packet<'binder>>, PacketSendError> {
     // Read reply
+    let mut ret_buf = ReturnBuffer::new(self.binder_dev, 256);
     CommandBuffer::new(self.binder_dev)
-      .exec(Some(&mut ret_buf));
+      .exec_always_block(Some(&mut ret_buf))
+      .unwrap();
     
     let mut latest_reply = None;
     let mut is_dead = false;
@@ -170,12 +177,32 @@ impl<'binder> Packet<'binder> {
     
     let latest_reply_is_some = latest_reply.is_some(); 
     match (latest_reply, is_dead, cant_be_sent, completed) {
-      (Some(reply), false, false, true) => Ok(reply),
+      (reply, false, false, true) => Ok(reply),
       (None, true, false, true) => Err(PacketSendError::DeadTarget),
       (None, false, true, false) => Err(PacketSendError::Failed),
       (None, false, false, false) => panic!("did not get any response for transaction from kernel"),
       _ => panic!("ambigious condition, latest_reply.is_some = {latest_reply_is_some}, is_dead = {is_dead}, cant_be_sent = {cant_be_sent}, completed = {completed}")
     }
+  }
+  
+  // If the transaction doesn't result anything. None is retured
+  // else error if there error
+  pub fn send(&self, target: ObjectRef) -> Result<Packet<'binder>, PacketSendError> {
+    if matches!(target, ObjectRef::Local(_)) {
+      todo!("Handle local transaction");
+    }
+    
+    let mut transaction = self.transaction.clone();
+    transaction.with_common_mut(|x| x.target = target);
+    
+    // Send transaction
+    CommandBuffer::new(self.binder_dev)
+      .enqueue_command(Command::SendTransaction(transaction))
+      .exec_always_block(None)
+      .unwrap();
+    
+    self.handle_result()
+      .map(|x| x.expect("reply was expected but kernel did not send any"))
   }
 }
 
