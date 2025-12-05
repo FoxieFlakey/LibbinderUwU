@@ -1,12 +1,19 @@
 use libbinder::packet::{Packet, builder::PacketBuilder};
 use libbinder_runtime::{Runtime, binder_object::BinderObject};
 
+use crate::common::log;
+
 struct ContextManager;
 
 impl BinderObject for ContextManager {
-  fn on_packet(&self, runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder<'_>) {
-    println!("Incoming transaction code: {}", packet.get_code());
+  fn on_packet(&self, _runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder<'_>) {
+    log!("Incoming transaction code: {}", packet.get_code());
     reply_builder.set_code(7875);
+    
+    let mut writer = reply_builder.writer();
+    writer.write_f64(0.872);
+    writer.write_f32(0.3);
+    writer.write_u32(9);
   }
 }
 

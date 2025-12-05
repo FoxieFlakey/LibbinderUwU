@@ -3,9 +3,11 @@ use std::{io, mem, os::fd::BorrowedFd};
 use enumflags2::BitFlags;
 use libbinder_raw::{ObjectRef, ObjectRefLocal, Transaction, TransactionFlag, TransactionKernelManaged};
 
-use crate::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder, return_buffer::{ReturnBuffer, ReturnValue}};
+use crate::{command_buffer::{Command, CommandBuffer}, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
 
 pub mod builder;
+pub mod reader;
+pub mod writer;
 
 // A friendly wrapper over transaction data for both incoming/outgoing
 // and perform parsing too
@@ -24,8 +26,8 @@ pub struct Packet<'binder> {
   // be dropped
   transaction: Transaction<'binder, 'static, 'static>,
   
-  data_buffer: Vec<u8>,
-  offset_buffer: Vec<usize>
+  pub(self) data_buffer: Vec<u8>,
+  pub(self) offset_buffer: Vec<usize>
 }
 
 impl<'binder> Into<PacketBuilder<'binder>> for Packet<'binder> {
@@ -99,6 +101,10 @@ impl<'binder> Packet<'binder> {
         transaction
       }
     )
+  }
+  
+  pub fn reader<'packet>(&'packet self) -> Reader<'packet, 'binder> {
+    Reader::new(self)
   }
   
   pub fn set_code(&mut self, code: u32) {

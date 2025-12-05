@@ -1,6 +1,8 @@
 use libbinder_raw::{ObjectRef, ObjectRefRemote};
 use libbinder_runtime::Runtime;
 
+use crate::common::log;
+
 pub fn main() {
   let runtime = Runtime::new().unwrap();
   nix::unistd::sleep(1);
@@ -12,5 +14,10 @@ pub fn main() {
         .build()
     ).unwrap();
   
-  println!("Responded with {}", response.get_code());
+  assert!(response.get_code() == 7875);
+  
+  let mut reader = response.reader();
+  log!("Read f64: {}", reader.read_f64().unwrap());
+  log!("Read f32: {}", reader.read_f32().unwrap());
+  log!("Read u32: {}", reader.read_u32().unwrap());
 }
