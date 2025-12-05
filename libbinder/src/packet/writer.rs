@@ -2,7 +2,7 @@ use std::{ffi::CStr, marker::PhantomData};
 
 use crate::{formats::WriteFormat, packet::{Packet, builder::PacketBuilder}};
 
-pub struct Writer<'packet, 'binder, Format: WriteFormat<'packet>> {
+pub struct Writer<'packet, 'binder: 'packet, Format: WriteFormat<'packet>> {
   format: Format,
   _phantom: PhantomData<&'packet Packet<'binder>>
 }

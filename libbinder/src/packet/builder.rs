@@ -47,7 +47,9 @@ impl<'binder> PacketBuilder<'binder> {
   
   // NOTE: This implicitly appends to data written
   // by previous writer
-  pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> Writer<'packet, 'binder, Format> {
+  pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> Writer<'packet, 'binder, Format>
+    where 'binder: 'packet
+  {
     Writer::new(self, format)
   }
   
