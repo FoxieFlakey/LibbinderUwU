@@ -1,7 +1,7 @@
-use std::{ffi::CString, mem, ops::Range, os::fd::{AsRawFd, BorrowedFd}, ptr};
+use std::{ops::Range, os::fd::{AsRawFd, BorrowedFd}, ptr};
 
 use enumflags2::{bitflags, BitFlags};
-use nix::{libc::{MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, PR_SET_VMA, PR_SET_VMA_ANON_NAME, PROT_EXEC, PROT_READ, PROT_WRITE, c_int, c_long, c_ulong, mmap, munmap, prctl}, Error};
+use nix::{libc::{MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, PROT_EXEC, PROT_READ, PROT_WRITE, c_int, mmap, munmap}, Error};
 use sync_ptr::SyncMutPtr;
 
 pub struct MmapRegion {
@@ -22,7 +22,7 @@ pub enum Protection {
 
 #[derive(Debug, Clone, Copy)]
 pub enum MmapError {
-  MmapError(#[expect(unused)] nix::Error)
+  MmapError(nix::Error)
 }
 
 impl Drop for MmapRegion {
@@ -45,13 +45,6 @@ impl MmapRegion {
     self.memory.end - self.memory.start
   }
   
-  pub fn get_range(&self) -> Range<*const u8> {
-    Range {
-      start: self.get_range_mut().start.cast_const(),
-      end: self.get_range_mut().end.cast_const(),
-    }
-  }
-  
   pub fn get_range_mut(&self) -> Range<*mut u8> {
     let offset_from_start = (self.memory.end - self.memory.start) * page_size::get();
     let start = self.base_addr.with_addr(self.memory.start * page_size::get());
@@ -65,10 +58,6 @@ impl MmapRegion {
   
   pub fn get_bytes_size(&self) -> usize {
     self.get_pg_count() * page_size::get()
-  }
-  
-  pub fn new(span: MemorySpan, flags: BitFlags<Protection>, is_shared: bool) -> Result<Self, MmapError> {
-    Self::new_impl(span, flags, is_shared, false, None)
   }
   
   // NOTE: Lifetime is not described here but
@@ -131,40 +120,6 @@ impl MmapRegion {
         memory: Range { start, end }
       }
     )
-  }
-  
-  pub fn leak(self) -> Range<*mut u8> {
-    let range = self.get_range_mut();
-    mem::forget(self);
-    range
-  } 
-  
-  pub fn set_name(&self, str: &str) {
-    let str = CString::new(str).unwrap();
-    let ret = unsafe { prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME as c_long, self.get_range().start.addr() as c_ulong, self.get_bytes_size() as c_ulong, str.as_ptr()) };
-    if ret == -1 {
-      panic!("Error setting name on VMA: {}", Error::last().desc());
-    }
-    drop(str);
-  }
-  
-  // # Safety
-  // 'range' start and end must page aligned the size is
-  // implicitly page aligned and non empty and valid memory
-  // mapped from mmap
-  pub unsafe fn from_raw_ptr_range(range: Range<*mut u8>) -> Self {
-    assert!(!range.is_empty());
-    assert!(range.start.addr().is_multiple_of(page_size::get()));
-    assert!(range.end.addr().is_multiple_of(page_size::get()));
-    assert!((range.end.addr() - range.start.addr()).is_multiple_of(page_size::get()));
-    
-    MmapRegion {
-      base_addr: SyncMutPtr::new(range.start),
-      memory: Range {
-        start: range.start.addr() / page_size::get(),
-        end: range.end.addr() / page_size::get()
-      }
-    }
   }
 }
 
