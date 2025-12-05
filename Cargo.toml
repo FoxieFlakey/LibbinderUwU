@@ -4,5 +4,5 @@ members = [
   "libbinder",
   "libbinder-raw",
   "binder-test"
-]
+, "libbinder-runtime"]
 

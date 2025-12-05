@@ -24,6 +24,10 @@ impl<'binder> PacketBuilder<'binder> {
     }
   }
   
+  pub fn get_binder_dev(&self) -> BorrowedFd<'binder> {
+    self.binder_dev
+  }
+  
   pub fn set_flags(&mut self, flags: BitFlags<TransactionFlag>) -> &mut Self {
     self.flags = Some(flags);
     self
@@ -32,6 +36,13 @@ impl<'binder> PacketBuilder<'binder> {
   pub fn set_code(&mut self, code: u32) -> &mut Self {
     self.code = Some(code);
     self
+  }
+  
+  pub fn clear(&mut self) {
+    self.data_buffer.clear();
+    self.offsets_buffer.clear();
+    self.flags = None;
+    self.code = None;
   }
   
   // After build the builder is 'reset'
