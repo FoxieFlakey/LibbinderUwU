@@ -161,7 +161,6 @@ fn run_looper(shared: Arc<Shared>, shutdown_pipe_rd: OwnedFd, do_register: bool)
           match v {
             ReturnValue::Noop => (),
             ReturnValue::Transaction((reference, packet)) => {
-              println!("[Looper] Incoming packet, code: {}. On object: 0x{:016x}", packet.get_code(), reference.data);
               let obj = unsafe {
                 binder_object::from_local_object_ref(&reference)
                   .as_ref()
