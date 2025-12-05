@@ -136,8 +136,12 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
       if do_poll {
         // Poll loop to wait until ready
         'poll_loop: loop {
+          if read_buf.len() == 0 {
+            break 'poll_loop;
+          }
+          
           let mut fds = [
-            PollFd::new(self.binder_dev.as_fd(), PollFlags::POLLIN | PollFlags::POLLOUT)
+            PollFd::new(self.binder_dev.as_fd(), PollFlags::POLLIN)
           ];
           
           match poll(&mut fds, PollTimeout::NONE) {
