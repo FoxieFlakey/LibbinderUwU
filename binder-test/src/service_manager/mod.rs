@@ -1,4 +1,4 @@
-use libbinder::packet::{Packet, builder::PacketBuilder};
+use libbinder::{formats::dead_simple::DeadSimpleFormat, packet::{Packet, builder::PacketBuilder}};
 use libbinder_runtime::{Runtime, binder_object::BinderObject};
 
 use crate::common::log;
@@ -10,7 +10,7 @@ impl BinderObject for ContextManager {
     log!("Incoming transaction code: {}", packet.get_code());
     reply_builder.set_code(7875);
     
-    let mut writer = reply_builder.writer();
+    let mut writer = reply_builder.writer(DeadSimpleFormat::new());
     writer.write_f64(0.872);
     writer.write_f32(0.3);
     writer.write_u32(9);

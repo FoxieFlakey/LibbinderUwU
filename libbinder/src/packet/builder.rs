@@ -3,7 +3,7 @@ use std::{mem, os::fd::BorrowedFd, slice};
 use enumflags2::BitFlags;
 use libbinder_raw::{ObjectRef, ObjectRefRemote, Transaction, TransactionDataCommon, TransactionFlag, TransactionNotKernelMananged};
 
-use crate::packet::{Packet, writer::Writer};
+use crate::{formats::WriteFormat, packet::{Packet, writer::Writer}};
 
 pub struct PacketBuilder<'binder> {
   pub(super) binder_dev: BorrowedFd<'binder>,
@@ -47,8 +47,8 @@ impl<'binder> PacketBuilder<'binder> {
   
   // NOTE: This implicitly appends to data written
   // by previous writer
-  pub fn writer<'a>(&'a mut self) -> Writer<'a, 'binder> {
-    Writer::new(self)
+  pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> Writer<'packet, 'binder, Format> {
+    Writer::new(self, format)
   }
   
   // After build the builder is 'reset'
