@@ -25,7 +25,7 @@ struct Shared<ContextManager: BinderObject<ContextManager>> {
 
 pub struct Runtime<ContextManager: BinderObject<ContextManager>> {
   shared: Arc<Shared<ContextManager>>,
-  looper_thrd: Option<JoinHandle<()>>,
+  looper_thrd: OnceLock<JoinHandle<()>>,
   // Exists here, so not contending on the 'ctx_manager' on shared
   // and can be borrowed
   cached_ctx_manager: OnceLock<Arc<ContextManager>>,
@@ -63,8 +63,8 @@ pub enum RuntimeCreateAsClientError {
 }
 
 impl<ContextManager: BinderObject<ContextManager> + ConreteObjectFromRemote<ContextManager>> Runtime<ContextManager> {
-  pub fn new() -> Result<Self, RuntimeCreateAsClientError> {
-    let mut rt= Self::new_impl().map_err(RuntimeCreateAsClientError::CommonCreateError)?;
+  pub fn new() -> Result<Arc<Self>, RuntimeCreateAsClientError> {
+    let rt= Self::new_impl().map_err(RuntimeCreateAsClientError::CommonCreateError)?;
     let concrete_manager = ContextManager::try_from_remote(&rt, ObjectRefRemote { data_handle: 0 })
       .map(Arc::new)
       .map_err(|_| RuntimeCreateAsClientError::WrongContextManagerType)?;
@@ -73,17 +73,17 @@ impl<ContextManager: BinderObject<ContextManager> + ConreteObjectFromRemote<Cont
     rt.cached_ctx_manager_upcasted.set(concrete_manager).ok().unwrap();
     
     let shared = rt.shared.clone();
-    rt.looper_thrd = Some(thread::spawn(move || {
+    rt.looper_thrd.set(thread::spawn(move || {
         run_looper(shared, false);
       }
-    ));
+    )).unwrap();
     Ok(rt)
   }
 }
 
 impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
-  pub fn new_as_manager(ctx_manager: Arc<ContextManager>) -> Result<Self, RuntimeCreateAsManagerError<ContextManager>> {
-    let mut rt = Self::new_impl()
+  pub fn new_as_manager(ctx_manager: Arc<ContextManager>) -> Result<Arc<Self>, RuntimeCreateAsManagerError<ContextManager>> {
+    let rt = Self::new_impl()
       .map_err(RuntimeCreateAsManagerError::CommonCreateError)?;
     
     let ctx_manager2 = ctx_manager.clone() as Arc<dyn BinderObject<ContextManager>>;
@@ -100,10 +100,10 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     rt.cached_ctx_manager_upcasted.set(ctx_manager).ok().unwrap();
     
     let shared = rt.shared.clone();
-    rt.looper_thrd = Some(thread::spawn(move || {
+    rt.looper_thrd.set(thread::spawn(move || {
         run_looper(shared, false);
       }
-    ));
+    )).unwrap();
     Ok(rt)
   }
 }
@@ -119,7 +119,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
 }
 
 impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
-  fn new_impl() -> Result<Self, RuntimeCreateError> {
+  fn new_impl() -> Result<Arc<Self>, RuntimeCreateError> {
     let (rd, wr) = nix::unistd::pipe()
       .map_err(io::Error::from)
       .map_err(RuntimeCreateError::ErrorCreatingPipe)?;
@@ -144,13 +144,13 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
       binder_dev
     });
     
-    Ok(Self {
-      looper_thrd: None,
+    Ok(Arc::new(Self {
+      looper_thrd: OnceLock::new(),
       cached_ctx_manager: OnceLock::new(),
       cached_ctx_manager_upcasted: OnceLock::new(),
       _phantom: PhantomData {},
       shared
-    })
+    }))
   }
   
   pub fn get_binder<'a>(&'a self) -> BorrowedFd<'a> {
@@ -192,7 +192,7 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(shared: Arc<Shared<C
       _phantom: PhantomData {},
       cached_ctx_manager: OnceLock::from(shared.ctx_manager.read().unwrap().clone().unwrap()),
       cached_ctx_manager_upcasted: OnceLock::from(shared.ctx_manager.read().unwrap().clone().unwrap() as Arc<dyn BinderObject<ContextManager>>),
-      looper_thrd: None
+      looper_thrd: OnceLock::new()
     };
     
     loop {
