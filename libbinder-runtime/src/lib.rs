@@ -4,8 +4,9 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{io, marker::PhantomData, mem, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
+use std::{collections::HashSet, io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, Mutex, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
 
+use by_address::ByAddress;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::{ObjectRefRemote, binder_set_context_mgr};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
@@ -20,6 +21,15 @@ struct Shared<ContextManager: BinderObject<ContextManager>> {
   shutdown_pipe_wr: OwnedFd,
   shutdown_pipe_rd: OwnedFd,
   ctx_manager: RwLock<Option<Arc<ContextManager>>>,
+  
+  // Contains strong references to local objects that was
+  // sent out Its used for 'drop' code to remove reference
+  // to it.
+  //
+  // Context manager is not here mainly due its
+  // not needed as there strong reference to it
+  // exist too on 'ctx_manager' field
+  local_objects: Mutex<HashSet<ByAddress<Arc<dyn BinderObject<ContextManager>>>>>,
   _binder_buffer: MmapRegion
 }
 
@@ -43,6 +53,8 @@ impl<ContextManager: BinderObject<ContextManager>> Drop for Runtime<ContextManag
       }
       handle.join().unwrap();
     }
+    
+    // Remove ref counts
   }
 }
 
@@ -131,6 +143,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     let shared = Arc::new(Shared {
       shutdown_pipe_wr: wr,
       shutdown_pipe_rd: rd,
+      local_objects: Mutex::new(HashSet::new()),
       _binder_buffer: MmapRegion::new_map_from_fd(MemorySpan {
           addr: None,
           nr_pages: 512
@@ -173,6 +186,7 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
   
   let binder_dev = shared.binder_dev.as_fd();
   let shutdown_pipe_rd = shared.shutdown_pipe_rd.as_fd();
+  let ctx_manager = shared.ctx_manager.read().unwrap().clone().unwrap() as Arc<dyn BinderObject<ContextManager>>;
   
   if do_register {
     CommandBuffer::new(binder_dev)
@@ -243,10 +257,10 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
               // SAFETY: Kernel make sure its same pointer as sent
               // which we mem::forget
               let obj = unsafe { binder_object::from_local_object_ref::<ContextManager>(&reference) };
+              assert!(Arc::ptr_eq(&obj, &ctx_manager), "BR_RELEASE was trigger for context mananger");
               
-              // SAFETY: Got it from previous, and is valid
-              unsafe { Arc::decrement_strong_count(Arc::as_ptr(&obj)) };
-              mem::forget(obj);
+              // Remove from local objects list
+              assert!(shared.local_objects.lock().unwrap().remove(&ByAddress(obj)), "Kernel sent BR_RELEASE on unknown object");
             }
             
             ReturnValue::Acquire(_) |
