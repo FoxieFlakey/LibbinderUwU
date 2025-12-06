@@ -15,6 +15,10 @@ pub struct RemoteBinderObject {
   remote_ref: ObjectRefRemote
 }
 
+pub trait ConreteObjectFromRemote<ContextManager: BinderObject>: Sized {
+  fn try_from_remote(runtime: &Runtime<ContextManager>, remote_ref: ObjectRefRemote) -> Result<Self, ()>;
+}
+
 impl BinderObject for RemoteBinderObject {
   fn on_packet(&self, runtime: &Runtime<dyn BinderObject>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
     match runtime.send_packet(self.remote_ref.clone(), packet) {
@@ -25,10 +29,8 @@ impl BinderObject for RemoteBinderObject {
   }
 }
 
-impl TryFrom<ObjectRefRemote> for RemoteBinderObject {
-  type Error = ();
-  
-  fn try_from(remote_ref: ObjectRefRemote) -> Result<Self, Self::Error> {
+impl<ContextManager: BinderObject> ConreteObjectFromRemote<ContextManager> for RemoteBinderObject {
+  fn try_from_remote(_runtime: &Runtime<ContextManager>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
     Ok(Self {
       remote_ref
     }) 

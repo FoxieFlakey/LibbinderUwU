@@ -4,14 +4,14 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::Arc, thread::{self, JoinHandle}};
+use std::{io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, RwLock}, thread::{self, JoinHandle}};
 
 use closure::closure;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::{ObjectRefRemote, binder_set_context_mgr};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
-use crate::{binder_object::{BinderObject, RemoteBinderObject}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
+use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
 
 pub mod binder_object;
 mod util;
@@ -19,7 +19,7 @@ mod util;
 struct Shared {
   binder_dev: OwnedFd,
   shutdown_pipe_wr: OwnedFd,
-  ctx_manager: Arc<dyn BinderObject>,
+  ctx_manager: RwLock<Option<Arc<dyn BinderObject>>>,
   _binder_buffer: MmapRegion
 }
 
@@ -53,15 +53,25 @@ pub enum RuntimeCreateAsManagerError<ContextManager: BinderObject> {
   CannotBeContextManager(Arc<ContextManager>, io::Error)
 }
 
-impl<ContextManager: BinderObject + TryFrom<ObjectRefRemote>> Runtime<ContextManager> {
-  pub fn new() -> Result<Self, RuntimeCreateError> {
-    Self::new_impl(None)
+pub enum RuntimeCreateAsClientError {
+  CommonCreateError(RuntimeCreateError),
+  WrongContextManagerType
+}
+
+impl<ContextManager: BinderObject + ConreteObjectFromRemote<ContextManager>> Runtime<ContextManager> {
+  pub fn new() -> Result<Self, RuntimeCreateAsClientError> {
+    let rt= Self::new_impl().map_err(RuntimeCreateAsClientError::CommonCreateError)?;
+    let concrete_manager = ContextManager::try_from_remote(&rt, ObjectRefRemote { data_handle: 0 })
+      .map(Arc::new)
+      .map_err(|_| RuntimeCreateAsClientError::WrongContextManagerType)?;
+    *rt.shared.ctx_manager.write().unwrap() = Some(concrete_manager);
+    Ok(rt)
   }
 }
 
 impl<ContextManager: BinderObject> Runtime<ContextManager> {
   pub fn new_as_manager(ctx_manager: Arc<ContextManager>) -> Result<Self, RuntimeCreateAsManagerError<ContextManager>> {
-    let ret = Self::new_impl(Some(ctx_manager.clone()))
+    let ret = Self::new_impl()
       .map_err(RuntimeCreateAsManagerError::CommonCreateError)?;
     
     let ctx_manager2 = ctx_manager.clone() as Arc<dyn BinderObject>;
@@ -73,6 +83,7 @@ impl<ContextManager: BinderObject> Runtime<ContextManager> {
     // Note: we manage the reference to concrete mgr
     // as the ctx_manager in the shared
     
+    *ret.shared.ctx_manager.write().unwrap() = Some(ctx_manager2);
     Ok(ret)
   }
 }
@@ -84,13 +95,13 @@ impl<ContextManager: BinderObject> Runtime<ContextManager> {
 }
 
 impl<ContextManager: BinderObject + ?Sized> Runtime<ContextManager> {
-  pub fn get_context_manager_object(&self) -> &Arc<dyn BinderObject> {
-    &self.shared.ctx_manager
+  pub fn get_context_manager_object(&self) -> Arc<dyn BinderObject> {
+    self.shared.ctx_manager.read().unwrap().clone().unwrap()
   }
 }
 
 impl<ContextManager: BinderObject + ?Sized> Runtime<ContextManager> {
-  fn new_impl(ctx_manager: Option<Arc<dyn BinderObject>>) -> Result<Self, RuntimeCreateError> {
+  fn new_impl() -> Result<Self, RuntimeCreateError> {
     let (rd, wr) = nix::unistd::pipe()
       .map_err(io::Error::from)
       .map_err(RuntimeCreateError::ErrorCreatingPipe)?;
@@ -110,10 +121,7 @@ impl<ContextManager: BinderObject + ?Sized> Runtime<ContextManager> {
             MmapError::MmapError(x) => RuntimeCreateError::ErrorMappingBuffer(x.into())
           }
         })?,
-      ctx_manager: ctx_manager
-        .unwrap_or_else(||
-          Arc::new(RemoteBinderObject::try_from(ObjectRefRemote { data_handle: 0 }).unwrap())
-        ),
+      ctx_manager: RwLock::new(None),
       binder_dev
     });
     
