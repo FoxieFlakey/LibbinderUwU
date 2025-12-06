@@ -9,6 +9,7 @@ mod common;
 mod service_manager;
 mod process_sync;
 mod app;
+mod interface;
 
 pub fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<32>();

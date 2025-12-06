@@ -3,25 +3,31 @@ use std::sync::Arc;
 use libbinder::{formats::dead_simple::DeadSimpleFormat, packet::{Packet, builder::PacketBuilder}};
 use libbinder_runtime::{Runtime, binder_object::BinderObject};
 
-use crate::common::log;
+use crate::{common::log, interface::IServiceManager};
 
 struct ContextManager;
 
-impl ContextManager {
-  pub fn bwah_uwu(&self) {
-    println!("hi uwu");
+impl IServiceManager for ContextManager {
+  fn length_of_string(&self, string: &str) -> usize {
+    log!("Length of string is {}", string.len());
+    string.len()
+  }
+  
+  fn bwah_uwu(&self, data: &str) {
+    log!("Bwah_uwu: {}", data);
   }
 }
 
 impl BinderObject<ContextManager> for ContextManager {
   fn on_packet(&self, _runtime: &Arc<Runtime<ContextManager>>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
-    log!("Incoming transaction code: {}", packet.get_code());
-    reply_builder.set_code(7875);
-    
-    let mut writer = reply_builder.writer(DeadSimpleFormat::new());
-    writer.write_f64(0.872);
-    writer.write_f32(0.3);
-    writer.write_u32(9);
+    match packet.get_code() {
+      _ => {
+        log!("Received unknown transaction code: {}", packet.get_code());
+        reply_builder.set_code(0x01);
+        reply_builder.writer(DeadSimpleFormat::new())
+          .write_str("unknown transaction code");
+      }
+    }
   }
 }
 
@@ -31,7 +37,7 @@ pub fn main() {
     .unwrap();
   
   let ctx = runtime.get_context_manager(); 
-  ctx.bwah_uwu();
+  ctx.bwah_uwu("HI UwU");
   loop { nix::unistd::sleep(1); }
 }
 

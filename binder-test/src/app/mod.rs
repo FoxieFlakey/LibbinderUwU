@@ -1,24 +1,13 @@
-use libbinder::{formats::dead_simple::DeadSimpleFormatReader, packet::builder::PacketBuilder};
-use libbinder_raw::CONTEXT_MANAGER_REF;
-use libbinder_runtime::{Runtime, binder_object::GenericContextManager};
+use libbinder_runtime::Runtime;
 
-use crate::common::log;
+use crate::{common::log, interface::{IServiceManager, RemoteServiceManager}};
 
 pub fn main() {
-  let runtime = Runtime::<GenericContextManager>::new().ok().unwrap();
+  let runtime = Runtime::<RemoteServiceManager>::new().ok().unwrap();
   nix::unistd::sleep(1);
   
-  let response = runtime.send_packet(
-      CONTEXT_MANAGER_REF,
-      &PacketBuilder::new()
-        .set_code(80386)
-        .build(runtime.get_binder())
-    ).unwrap();
-  
-  assert!(response.get_code() == 7875);
-  
-  let mut reader = response.reader(DeadSimpleFormatReader::new());
-  log!("Read f64: {}", reader.read_f64().unwrap());
-  log!("Read f32: {}", reader.read_f32().unwrap());
-  log!("Read u32: {}", reader.read_u32().unwrap());
+  let ctx_mgr = &**runtime.get_context_manager() as &dyn IServiceManager;
+  ctx_mgr.bwah_uwu("Yoooo this is called from other process UwU");
+  let length = ctx_mgr.length_of_string("String");
+  log!("Length of string is {length}");
 }
