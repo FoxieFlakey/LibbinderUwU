@@ -1,9 +1,12 @@
-use std::{ffi::CStr, marker::PhantomData};
+use std::{ffi::CStr, marker::PhantomData, mem};
+
+use libbinder_raw::ObjectRef;
 
 use crate::{formats::{InnerWriter, WriteFormat}, packet::builder::PacketBuilder};
 
 pub struct Writer<'packet, Format: WriteFormat<'packet>> {
   format: Format,
+  offsets: Vec<usize>,
   _phantom: PhantomData<&'packet ()>
 }
 
@@ -23,12 +26,14 @@ impl<'builder> InnerWriter<'builder> for WriterState<'builder> {
 
 impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
   pub(crate) fn new(packet: &'packet mut PacketBuilder, mut format: Format) -> Self {
+    let offsets = mem::replace(&mut packet.offsets_buffer, Vec::new());
     format.set_writer(Box::new(WriterState {
       packet
     }));
     
     Self {
       _phantom: PhantomData {},
+      offsets,
       format
     }
   }
@@ -72,5 +77,13 @@ impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
   impl_forward!(write_str, write_str_array, write_str_slice, &str);
   impl_forward!(write_cstr, write_cstr_array, write_cstr_slice, &CStr);
   impl_forward!(write_bool, write_bool_array, write_bool_slice, bool);
+  
+  pub fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
+    let offset = self.format.get_writer().get_current_offset();
+    self.offsets.push(offset);
+    obj_ref.with_raw_bytes(|bytes| {
+      self.format.get_writer().write(bytes);
+    });
+  }
 }
 
