@@ -219,6 +219,8 @@ macro_rules! impl_slice {
     fn $name(&mut self) -> Result<SliceReadResult<'reader, $type>, ()> {
       let length = self.read_usize()?;
       let bytes = self.get_reader().read(length * size_of::<$type>())?;
+      // Ensure that reader actually read all byte necessary
+      assert!(bytes.len() == length * size_of::<$type>());
       Ok(
         bytemuck::try_from_bytes::<$type>(bytes)
           .map(SliceReadResult::Borrowed)
@@ -352,13 +354,17 @@ impl<'reader> ReadFormat<'reader> for DeadSimpleFormatReader<'reader> {
   
   fn read_str(&mut self) -> Result<&'reader str, ()> {
     let length = self.read_usize()?;
-    str::from_utf8(self.get_reader().read(length)?)
+    let bytes = self.get_reader().read(length)?;
+    assert!(bytes.len() == length);
+    str::from_utf8(bytes)
       .map_err(|_| ())
   }
   
   fn read_u8_slice(&mut self) -> Result<&'reader [u8], ()> {
     let length = self.read_usize()?;
-    self.get_reader().read(length)
+    let bytes = self.get_reader().read(length)?;
+    assert!(bytes.len() == length);
+    Ok(bytes)
   }
   impl_slice!(read_u16_slice, u16);
   impl_slice!(read_u32_slice, u32);
