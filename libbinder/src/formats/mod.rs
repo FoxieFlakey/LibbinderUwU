@@ -70,10 +70,15 @@ pub trait ReadFormat<'reader>: Clone {
   fn read_bool_slice(&mut self) -> Result<&'reader [bool], ()>;
 }
 
+pub trait InnerWriter<'writer> {
+  fn write(&mut self, bytes: &[u8]);
+  fn get_current_offset(&self) -> usize;
+}
+
 pub trait WriteFormat<'writer> {
   // Set a writer to use
-  fn set_writer(&mut self, writer: Box<dyn FnMut(&[u8]) + 'writer>);
-  fn get_writer(&mut self) -> &mut dyn FnMut(&[u8]);
+  fn set_writer(&mut self, writer: Box<dyn InnerWriter<'writer> + 'writer>);
+  fn get_writer(&mut self) -> &mut Box<dyn InnerWriter<'writer> + 'writer>;
   
   fn write_u8(&mut self, data: u8);
   fn write_u16(&mut self, data: u16);

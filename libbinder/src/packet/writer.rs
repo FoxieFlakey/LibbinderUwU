@@ -1,15 +1,31 @@
 use std::{ffi::CStr, marker::PhantomData};
 
-use crate::{formats::WriteFormat, packet::builder::PacketBuilder};
+use crate::{formats::{InnerWriter, WriteFormat}, packet::builder::PacketBuilder};
 
 pub struct Writer<'packet, Format: WriteFormat<'packet>> {
   format: Format,
   _phantom: PhantomData<&'packet ()>
 }
 
+struct WriterState<'builder> {
+  packet: &'builder mut PacketBuilder
+}
+
+impl<'builder> InnerWriter<'builder> for WriterState<'builder> {
+  fn get_current_offset(&self) -> usize {
+    self.packet.data_buffer.len()
+  }
+  
+  fn write(&mut self, bytes: &[u8]) {
+    self.packet.data_buffer.extend_from_slice(bytes);
+  }
+}
+
 impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
   pub(crate) fn new(packet: &'packet mut PacketBuilder, mut format: Format) -> Self {
-    format.set_writer(Box::new(|bytes| packet.data_buffer.extend_from_slice(bytes)));
+    format.set_writer(Box::new(WriterState {
+      packet
+    }));
     
     Self {
       _phantom: PhantomData {},
