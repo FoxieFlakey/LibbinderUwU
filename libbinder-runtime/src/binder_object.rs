@@ -1,12 +1,38 @@
-use std::{mem, ptr::{self, DynMetadata}, sync::Arc};
+use std::{any::Any, mem, ptr::{self, DynMetadata}, sync::Arc};
 
-use libbinder::packet::{Packet, builder::PacketBuilder};
-use libbinder_raw::ObjectRefLocal;
+use libbinder::packet::{Packet, PacketSendError, builder::PacketBuilder};
+use libbinder_raw::{ObjectRefLocal, ObjectRefRemote};
 
 use crate::Runtime;
 
-pub trait BinderObject: Sync + Send + 'static {
-  fn on_packet(&self, runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder);
+// Any binder object should be able to be casted
+// to its concrete type
+pub trait BinderObject: Any + Sync + Send + 'static {
+  fn on_packet(&self, runtime: &Runtime<dyn BinderObject>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder);
+}
+
+pub struct RemoteBinderObject {
+  remote_ref: ObjectRefRemote
+}
+
+impl BinderObject for RemoteBinderObject {
+  fn on_packet(&self, runtime: &Runtime<dyn BinderObject>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
+    match runtime.send_packet(self.remote_ref.clone(), packet) {
+      Ok(reply) => *reply_builder = reply.into(),
+      Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
+      Err(e) => panic!("Error occur while proxying to remote object: {e:#?}")
+    }
+  }
+}
+
+impl TryFrom<ObjectRefRemote> for RemoteBinderObject {
+  type Error = ();
+  
+  fn try_from(remote_ref: ObjectRefRemote) -> Result<Self, Self::Error> {
+    Ok(Self {
+      remote_ref
+    }) 
+  }
 }
 
 // This does increments the strong count

@@ -7,8 +7,14 @@ use crate::common::log;
 
 struct ContextManager;
 
+impl ContextManager {
+  pub fn bwah_uwu(&self) {
+    println!("hi uwu");
+  }
+}
+
 impl BinderObject for ContextManager {
-  fn on_packet(&self, _runtime: &Runtime, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
+  fn on_packet(&self, _runtime: &Runtime<dyn BinderObject>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
     log!("Incoming transaction code: {}", packet.get_code());
     reply_builder.set_code(7875);
     
@@ -20,9 +26,12 @@ impl BinderObject for ContextManager {
 }
 
 pub fn main() {
-  let runtime = Runtime::new().unwrap();
-  runtime.become_manager(Arc::new(ContextManager)).map_err(|x| x.1).unwrap();
+  let runtime = Runtime::new_as_manager(Arc::new(ContextManager))
+    .ok()
+    .unwrap();
   
+  let ctx = runtime.get_context_manager(); 
+  ctx.bwah_uwu();
   loop { nix::unistd::sleep(1); }
 }
 
