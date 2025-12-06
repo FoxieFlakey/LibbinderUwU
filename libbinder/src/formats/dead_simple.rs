@@ -92,7 +92,6 @@ impl<'writer> WriteFormat<'writer> for DeadSimpleFormat<'writer> {
   }
   
   fn write_str(&mut self, data: &str) {
-    self.write_usize(data.len());
     self.write_u8_slice(data.as_bytes());
   }
   
