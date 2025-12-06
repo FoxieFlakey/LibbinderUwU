@@ -6,7 +6,7 @@ use libbinder_raw::{ObjectRefLocal, ObjectRefRemote};
 use crate::Runtime;
 
 pub trait BinderObject<ContextManager: BinderObject<ContextManager>>: Sync + Send + 'static {
-  fn on_packet(&self, runtime: &Runtime<ContextManager>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder);
+  fn on_packet(&self, runtime: &Arc<Runtime<ContextManager>>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder);
 }
 
 pub struct GenericContextManager {
@@ -14,11 +14,11 @@ pub struct GenericContextManager {
 }
 
 pub trait ConreteObjectFromRemote<ContextManager: BinderObject<ContextManager>>: Sized {
-  fn try_from_remote(runtime: &Runtime<ContextManager>, remote_ref: ObjectRefRemote) -> Result<Self, ()>;
+  fn try_from_remote(runtime: &Arc<Runtime<ContextManager>>, remote_ref: ObjectRefRemote) -> Result<Self, ()>;
 }
 
 impl BinderObject<GenericContextManager> for GenericContextManager {
-  fn on_packet(&self, runtime: &Runtime<GenericContextManager>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
+  fn on_packet(&self, runtime: &Arc<Runtime<GenericContextManager>>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
     match runtime.send_packet(self.remote_ref.clone(), packet) {
       Ok(reply) => *reply_builder = reply.into(),
       Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
@@ -28,7 +28,7 @@ impl BinderObject<GenericContextManager> for GenericContextManager {
 }
 
 impl<ContextManager: BinderObject<ContextManager>> ConreteObjectFromRemote<ContextManager> for GenericContextManager {
-  fn try_from_remote(_runtime: &Runtime<ContextManager>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
+  fn try_from_remote(_runtime: &Arc<Runtime<ContextManager>>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
     Ok(Self {
       remote_ref
     }) 

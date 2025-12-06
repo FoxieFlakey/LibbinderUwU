@@ -14,7 +14,7 @@ impl ContextManager {
 }
 
 impl BinderObject<ContextManager> for ContextManager {
-  fn on_packet(&self, _runtime: &Runtime<ContextManager>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
+  fn on_packet(&self, _runtime: &Arc<Runtime<ContextManager>>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
     log!("Incoming transaction code: {}", packet.get_code());
     reply_builder.set_code(7875);
     
