@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use libbinder::{formats::dead_simple::DeadSimpleFormat, packet::{Packet, builder::PacketBuilder}};
 use libbinder_runtime::{Runtime, binder_object::BinderObject};
 
@@ -19,7 +21,7 @@ impl BinderObject for ContextManager {
 
 pub fn main() {
   let runtime = Runtime::new().unwrap();
-  runtime.become_manager(Box::new(ContextManager)).map_err(|x| x.1).unwrap();
+  runtime.become_manager(Arc::new(ContextManager)).map_err(|x| x.1).unwrap();
   
   loop { nix::unistd::sleep(1); }
 }

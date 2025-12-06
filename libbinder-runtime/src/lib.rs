@@ -4,7 +4,7 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{io, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::Arc, thread::{self, JoinHandle}};
+use std::{io, mem, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::Arc, thread::{self, JoinHandle}};
 
 use closure::closure;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
@@ -91,14 +91,12 @@ impl Runtime {
     packet.send(target)
   }
   
-  pub fn become_manager(&self, mgr_object: Box<dyn BinderObject>) -> Result<(), (Box<dyn BinderObject>, io::Error)> {
-    // TODO: Handle memory allocation instead leaking
-    let leaked = Box::leak(mgr_object);
-    let local_ref = binder_object::into_local_object_ref(leaked);
+  pub fn become_manager(&self, mgr_object: Arc<dyn BinderObject>) -> Result<(), (Arc<dyn BinderObject>, io::Error)> {
+    let local_ref = binder_object::into_local_object_ref(&mgr_object);
     if let Err(e) = binder_set_context_mgr(self.shared.binder_dev.as_fd(), &local_ref) {
-      // SAFETY: We made it with Box
-      return Err((unsafe { Box::from_raw(leaked) }, e.into()));
+      return Err((mgr_object, e.into()));
     }
+    mem::forget(mgr_object);
     Ok(())
   }
 }
@@ -161,11 +159,7 @@ fn run_looper(shared: Arc<Shared>, shutdown_pipe_rd: OwnedFd, do_register: bool)
           match v {
             ReturnValue::Noop => (),
             ReturnValue::Transaction((reference, packet)) => {
-              let obj = unsafe {
-                binder_object::from_local_object_ref(&reference)
-                  .as_ref()
-                  .unwrap()
-              };
+              let obj = unsafe { binder_object::from_local_object_ref(&reference) };
               
               obj.on_packet(&mock_runtime, &packet, &mut reply_builder);
               
