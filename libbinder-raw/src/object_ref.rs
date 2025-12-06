@@ -1,3 +1,5 @@
+use std::{ptr, slice};
+
 use enumflags2::{BitFlag, BitFlags, bitflags};
 
 use crate::{BinderUsize, ObjectHeader, object};
@@ -41,12 +43,15 @@ pub enum ObjectRef {
 }
 
 impl ObjectRef {
-  #[expect(unused)]
-  pub(crate) fn into_raw(&self) -> ObjectRefRaw {
-    match self {
+  pub fn with_raw_bytes<R, F: FnOnce(&[u8]) -> R>(&self, func: F) -> R {
+    let raw = match self {
       ObjectRef::Local(x) => x.into_raw(),
       ObjectRef::Remote(x) => x.into_raw()
-    }
+    };
+    
+    let ret = func(unsafe { slice::from_raw_parts(ptr::from_ref(&raw).cast::<u8>(), size_of::<ObjectRefRaw>()) });
+    drop(raw);
+    ret
   }
 }
 
