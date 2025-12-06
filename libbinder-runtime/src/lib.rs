@@ -15,7 +15,7 @@ use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::
 pub mod binder_object;
 mod util;
 
-struct Shared<ContextManager: BinderObject<ContextManager> + ?Sized> {
+struct Shared<ContextManager: BinderObject<ContextManager>> {
   binder_dev: OwnedFd,
   shutdown_pipe_wr: OwnedFd,
   shutdown_pipe_rd: OwnedFd,
@@ -23,7 +23,7 @@ struct Shared<ContextManager: BinderObject<ContextManager> + ?Sized> {
   _binder_buffer: MmapRegion
 }
 
-pub struct Runtime<ContextManager: BinderObject<ContextManager> + ?Sized> {
+pub struct Runtime<ContextManager: BinderObject<ContextManager>> {
   shared: Arc<Shared<ContextManager>>,
   looper_thrd: Option<JoinHandle<()>>,
   // Exists here, so not contending on the 'ctx_manager' on shared
@@ -33,7 +33,7 @@ pub struct Runtime<ContextManager: BinderObject<ContextManager> + ?Sized> {
   _phantom: PhantomData<&'static ContextManager>
 }
 
-impl<ContextManager: BinderObject<ContextManager> + ?Sized> Drop for Runtime<ContextManager> {
+impl<ContextManager: BinderObject<ContextManager>> Drop for Runtime<ContextManager> {
   fn drop(&mut self) {
     if let Some(handle) = self.looper_thrd.take() {
       while let Err(e) = nix::unistd::write(self.shared.shutdown_pipe_wr.as_fd(), &[0]) {
@@ -118,7 +118,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager> + ?Sized> Runtime<ContextManager> {
+impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   fn new_impl() -> Result<Self, RuntimeCreateError> {
     let (rd, wr) = nix::unistd::pipe()
       .map_err(io::Error::from)

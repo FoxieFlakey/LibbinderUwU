@@ -5,7 +5,7 @@ use libbinder_raw::{ObjectRefLocal, ObjectRefRemote};
 
 use crate::Runtime;
 
-pub trait BinderObject<ContextManager: BinderObject<ContextManager> + ?Sized>: Sync + Send + 'static {
+pub trait BinderObject<ContextManager: BinderObject<ContextManager>>: Sync + Send + 'static {
   fn on_packet(&self, runtime: &Runtime<ContextManager>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder);
 }
 
@@ -13,7 +13,7 @@ pub struct GenericContextManager {
   remote_ref: ObjectRefRemote
 }
 
-pub trait ConreteObjectFromRemote<ContextManager: BinderObject<ContextManager> + ?Sized>: Sized {
+pub trait ConreteObjectFromRemote<ContextManager: BinderObject<ContextManager>>: Sized {
   fn try_from_remote(runtime: &Runtime<ContextManager>, remote_ref: ObjectRefRemote) -> Result<Self, ()>;
 }
 
@@ -27,7 +27,7 @@ impl BinderObject<GenericContextManager> for GenericContextManager {
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager> + ?Sized> ConreteObjectFromRemote<ContextManager> for GenericContextManager {
+impl<ContextManager: BinderObject<ContextManager>> ConreteObjectFromRemote<ContextManager> for GenericContextManager {
   fn try_from_remote(_runtime: &Runtime<ContextManager>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
     Ok(Self {
       remote_ref
