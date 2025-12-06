@@ -4,7 +4,7 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
+use std::{io, marker::PhantomData, mem, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
 
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::{ObjectRefRemote, binder_set_context_mgr};
@@ -228,6 +228,8 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
           match v {
             ReturnValue::Noop => (),
             ReturnValue::Transaction((reference, packet)) => {
+              // SAFETY: Kernel make sure its same pointer as sent
+              // which we mem::forget
               let obj = unsafe { binder_object::from_local_object_ref(&reference) };
               
               obj.on_packet(&runtime, &packet, &mut reply_builder);
@@ -236,9 +238,19 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
               reply.send_as_reply().unwrap();
               reply_builder = reply.into();
             }
+            
+            ReturnValue::Release(reference) => {
+              // SAFETY: Kernel make sure its same pointer as sent
+              // which we mem::forget
+              let obj = unsafe { binder_object::from_local_object_ref::<ContextManager>(&reference) };
+              
+              // SAFETY: Got it from previous, and is valid
+              unsafe { Arc::decrement_strong_count(Arc::as_ptr(&obj)) };
+              mem::forget(obj);
+            }
+            
             ReturnValue::Acquire(_) |
             ReturnValue::AcquireWeak(_) |
-            ReturnValue::Release(_) |
             ReturnValue::ReleaseWeak(_) |
             ReturnValue::Ok |
             ReturnValue::Error(_) |
