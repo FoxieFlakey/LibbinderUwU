@@ -236,7 +236,18 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
               reply.send_as_reply().unwrap();
               reply_builder = reply.into();
             }
-            _ => unimplemented!()
+            ReturnValue::Acquire(_) |
+            ReturnValue::AcquireWeak(_) |
+            ReturnValue::Release(_) |
+            ReturnValue::ReleaseWeak(_) |
+            ReturnValue::Ok |
+            ReturnValue::Error(_) |
+            ReturnValue::SpawnLooper |
+            ReturnValue::DeadReply |
+            ReturnValue::TransactionComplete |
+            ReturnValue::TransactionFailed |
+            ReturnValue::Reply(_)
+            => unimplemented!()
           }
         });
     }
