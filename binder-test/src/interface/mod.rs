@@ -4,7 +4,7 @@ use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}
 use libbinder_raw::ObjectRefRemote;
 use libbinder_runtime::{Runtime, binder_object::{BinderObject, ConreteObjectFromRemote}};
 
-pub trait IServiceManager: Send + Sync {
+pub trait IAnService: Send + Sync {
   fn length_of_string(&self, string: &str) -> usize;
   fn bwah_uwu(&self, data: &str);
 }
@@ -14,12 +14,15 @@ pub const ISERVICE_MANAGER_RET_ERR: u32 = 0x01;
 pub const ISERVICE_MANAGER_CODE_LENGTH_OF_STRING: u32 = 0x01;
 pub const ISERVICE_MANAGER_CODE_BWAH_UWU: u32 = 0x02;
 
-pub struct RemoteServiceManager {
-  runtime: Arc<Runtime<RemoteServiceManager>>,
+// Possibly can be generated at compile time doesn't need to
+// hardcode. This proxies thru Binder to actual implementation
+// on diff process
+pub struct AnServiceProxy {
+  runtime: Arc<Runtime<AnServiceProxy>>,
   remote_ref: ObjectRefRemote
 }
 
-impl RemoteServiceManager {
+impl AnServiceProxy {
   fn handle_err(&self, packet: &Packet) -> ! {
     assert!(packet.get_code() == ISERVICE_MANAGER_RET_ERR);
     let err_msg = packet.reader(DeadSimpleFormatReader::new()).read_str()
@@ -28,7 +31,7 @@ impl RemoteServiceManager {
   }
 }
 
-impl IServiceManager for RemoteServiceManager {
+impl IAnService for AnServiceProxy {
   fn bwah_uwu(&self, data: &str) {
     let mut builder = PacketBuilder::new();
     builder.writer(DeadSimpleFormat::new())
@@ -62,17 +65,17 @@ impl IServiceManager for RemoteServiceManager {
   }
 }
 
-impl ConreteObjectFromRemote<RemoteServiceManager> for RemoteServiceManager {
-  fn try_from_remote(runtime: &Arc<Runtime<RemoteServiceManager>>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
-    Ok(RemoteServiceManager {
+impl ConreteObjectFromRemote<AnServiceProxy> for AnServiceProxy {
+  fn try_from_remote(runtime: &Arc<Runtime<AnServiceProxy>>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
+    Ok(AnServiceProxy {
       runtime: runtime.clone(),
       remote_ref
     })
   }
 }
 
-impl BinderObject<RemoteServiceManager> for RemoteServiceManager {
-  fn on_packet(&self, runtime: &Arc<Runtime<RemoteServiceManager>>, packet: &libbinder::packet::Packet<'_>, reply_builder: &mut libbinder::packet::builder::PacketBuilder) {
+impl BinderObject<AnServiceProxy> for AnServiceProxy {
+  fn on_packet(&self, runtime: &Arc<Runtime<AnServiceProxy>>, packet: &libbinder::packet::Packet<'_>, reply_builder: &mut libbinder::packet::builder::PacketBuilder) {
     match runtime.send_packet(self.remote_ref.clone(), packet) {
       Ok(reply) => *reply_builder = reply.into(),
       Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
