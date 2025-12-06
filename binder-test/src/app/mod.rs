@@ -15,7 +15,7 @@ pub fn main() {
   // It is upcasted to IAnService to show that  concrete
   // type is not need and this is how pattern generally is like
   let ctx_mgr = runtime.get_context_manager().clone() as Arc<dyn IAnService>;
-  ctx_mgr.bwah_uwu("Yoooo this is called from other process UwU");
+  ctx_mgr.bwah_uwu("Meooow this is called from other process UwU");
   let length = ctx_mgr.length_of_string("String");
   log!("Length of string is {length}");
 }
