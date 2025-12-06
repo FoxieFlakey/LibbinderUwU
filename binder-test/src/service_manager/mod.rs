@@ -18,6 +18,17 @@ impl IServiceManager for ContextManager {
   }
 }
 
+pub fn main() {
+  let runtime = Runtime::new_as_manager(Arc::new(ContextManager))
+    .ok()
+    .unwrap();
+  
+  let ctx = runtime.get_context_manager(); 
+  ctx.bwah_uwu("HI UwU");
+  loop { nix::unistd::sleep(1); }
+}
+
+
 impl BinderObject<ContextManager> for ContextManager {
   fn on_packet(&self, _runtime: &Arc<Runtime<ContextManager>>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
     reply_builder.set_code(ISERVICE_MANAGER_RET_OK);
@@ -55,13 +66,4 @@ impl BinderObject<ContextManager> for ContextManager {
   }
 }
 
-pub fn main() {
-  let runtime = Runtime::new_as_manager(Arc::new(ContextManager))
-    .ok()
-    .unwrap();
-  
-  let ctx = runtime.get_context_manager(); 
-  ctx.bwah_uwu("HI UwU");
-  loop { nix::unistd::sleep(1); }
-}
 
