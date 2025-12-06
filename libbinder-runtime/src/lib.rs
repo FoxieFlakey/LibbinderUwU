@@ -4,7 +4,7 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, OnceLock, RwLock}, thread::{self, JoinHandle}};
+use std::{io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
 
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::{ObjectRefRemote, binder_set_context_mgr};
@@ -72,9 +72,9 @@ impl<ContextManager: BinderObject<ContextManager> + ConreteObjectFromRemote<Cont
     rt.cached_ctx_manager.set(concrete_manager.clone()).ok().unwrap();
     rt.cached_ctx_manager_upcasted.set(concrete_manager).ok().unwrap();
     
-    let shared = rt.shared.clone();
+    let runtime_weak = Arc::downgrade(&rt);
     rt.looper_thrd.set(thread::spawn(move || {
-        run_looper(shared, false);
+        run_looper(runtime_weak, false);
       }
     )).unwrap();
     Ok(rt)
@@ -99,9 +99,9 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     rt.cached_ctx_manager.set(ctx_manager.clone()).ok().unwrap();
     rt.cached_ctx_manager_upcasted.set(ctx_manager).ok().unwrap();
     
-    let shared = rt.shared.clone();
+    let runtime_weak = Arc::downgrade(&rt);
     rt.looper_thrd.set(thread::spawn(move || {
-        run_looper(shared, false);
+        run_looper(runtime_weak, false);
       }
     )).unwrap();
     Ok(rt)
@@ -163,7 +163,14 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   }
 }
 
-fn run_looper<ContextManager: BinderObject<ContextManager>>(shared: Arc<Shared<ContextManager>>, do_register: bool) {
+fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtime<ContextManager>>, do_register: bool) {
+  let shared = match runtime.upgrade() {
+    Some(ref rt) => rt.shared.clone(),
+    
+    // Runtime already dead soo early
+    None => return
+  };
+  
   let binder_dev = shared.binder_dev.as_fd();
   let shutdown_pipe_rd = shared.shutdown_pipe_rd.as_fd();
   
@@ -186,14 +193,6 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(shared: Arc<Shared<C
       PollFd::new(shutdown_pipe_rd.as_fd(), PollFlags::POLLIN),
       PollFd::new(binder_dev, PollFlags::POLLIN),
     ];
-    
-    let mock_runtime = Runtime {
-      shared: shared.clone(),
-      _phantom: PhantomData {},
-      cached_ctx_manager: OnceLock::from(shared.ctx_manager.read().unwrap().clone().unwrap()),
-      cached_ctx_manager_upcasted: OnceLock::from(shared.ctx_manager.read().unwrap().clone().unwrap() as Arc<dyn BinderObject<ContextManager>>),
-      looper_thrd: OnceLock::new()
-    };
     
     loop {
       match poll(&mut fds, PollTimeout::NONE) {
@@ -219,6 +218,10 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(shared: Arc<Shared<C
         ExecResult::WouldBlockOnWrite(_) => panic!("shouldn't happen")
       }
       
+      let Some(runtime) = runtime.upgrade() else {
+          // Runtime is dead, quit
+          break 'poll_loop;
+        };
       ret_buf.get_parsed()
         .iter()
         .for_each(|v| {
@@ -227,7 +230,7 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(shared: Arc<Shared<C
             ReturnValue::Transaction((reference, packet)) => {
               let obj = unsafe { binder_object::from_local_object_ref(&reference) };
               
-              obj.on_packet(&mock_runtime, &packet, &mut reply_builder);
+              obj.on_packet(&runtime, &packet, &mut reply_builder);
               
               let reply = reply_builder.build(binder_dev);
               reply.send_as_reply().unwrap();
