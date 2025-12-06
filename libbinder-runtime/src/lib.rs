@@ -4,7 +4,7 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, RwLock}, thread::{self, JoinHandle}};
+use std::{io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, OnceLock, RwLock}, thread::{self, JoinHandle}};
 
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::{ObjectRefRemote, binder_set_context_mgr};
@@ -28,8 +28,8 @@ pub struct Runtime<ContextManager: BinderObject<ContextManager>> {
   looper_thrd: Option<JoinHandle<()>>,
   // Exists here, so not contending on the 'ctx_manager' on shared
   // and can be borrowed
-  cached_ctx_manager: Option<Arc<ContextManager>>,
-  cached_ctx_manager_upcasted: Option<Arc<dyn BinderObject<ContextManager>>>,
+  cached_ctx_manager: OnceLock<Arc<ContextManager>>,
+  cached_ctx_manager_upcasted: OnceLock<Arc<dyn BinderObject<ContextManager>>>,
   _phantom: PhantomData<&'static ContextManager>
 }
 
@@ -69,8 +69,8 @@ impl<ContextManager: BinderObject<ContextManager> + ConreteObjectFromRemote<Cont
       .map(Arc::new)
       .map_err(|_| RuntimeCreateAsClientError::WrongContextManagerType)?;
     *rt.shared.ctx_manager.write().unwrap() = Some(concrete_manager.clone());
-    rt.cached_ctx_manager = Some(concrete_manager.clone());
-    rt.cached_ctx_manager_upcasted = Some(concrete_manager);
+    rt.cached_ctx_manager.set(concrete_manager.clone()).ok().unwrap();
+    rt.cached_ctx_manager_upcasted.set(concrete_manager).ok().unwrap();
     
     let shared = rt.shared.clone();
     rt.looper_thrd = Some(thread::spawn(move || {
@@ -96,8 +96,8 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     // as the ctx_manager in the shared
     
     *rt.shared.ctx_manager.write().unwrap() = Some(ctx_manager.clone());
-    rt.cached_ctx_manager = Some(ctx_manager.clone());
-    rt.cached_ctx_manager_upcasted = Some(ctx_manager);
+    rt.cached_ctx_manager.set(ctx_manager.clone()).ok().unwrap();
+    rt.cached_ctx_manager_upcasted.set(ctx_manager).ok().unwrap();
     
     let shared = rt.shared.clone();
     rt.looper_thrd = Some(thread::spawn(move || {
@@ -110,11 +110,11 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
 
 impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   pub fn get_context_manager(&self) -> &Arc<ContextManager> {
-    self.cached_ctx_manager.as_ref().unwrap()
+    self.cached_ctx_manager.get().unwrap()
   }
   
   pub fn get_context_manager_object(&self) -> &Arc<dyn BinderObject<ContextManager>> {
-    self.cached_ctx_manager_upcasted.as_ref().unwrap()
+    self.cached_ctx_manager_upcasted.get().unwrap()
   }
 }
 
@@ -146,8 +146,8 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     
     Ok(Self {
       looper_thrd: None,
-      cached_ctx_manager: None,
-      cached_ctx_manager_upcasted: None,
+      cached_ctx_manager: OnceLock::new(),
+      cached_ctx_manager_upcasted: OnceLock::new(),
       _phantom: PhantomData {},
       shared
     })
@@ -190,8 +190,8 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(shared: Arc<Shared<C
     let mock_runtime = Runtime {
       shared: shared.clone(),
       _phantom: PhantomData {},
-      cached_ctx_manager: Some(shared.ctx_manager.read().unwrap().clone().unwrap()),
-      cached_ctx_manager_upcasted: Some(shared.ctx_manager.read().unwrap().clone().unwrap()),
+      cached_ctx_manager: OnceLock::from(shared.ctx_manager.read().unwrap().clone().unwrap()),
+      cached_ctx_manager_upcasted: OnceLock::from(shared.ctx_manager.read().unwrap().clone().unwrap() as Arc<dyn BinderObject<ContextManager>>),
       looper_thrd: None
     };
     
