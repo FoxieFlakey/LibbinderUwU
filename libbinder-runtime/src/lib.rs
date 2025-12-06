@@ -29,6 +29,15 @@ struct Shared<ContextManager: BinderObject<ContextManager>> {
   // Context manager is not here mainly due its
   // not needed as there strong reference to it
   // exist too on 'ctx_manager' field
+  //
+  // Because shenanign shit with vtable being differ even
+  // for same underlying conrete type, there potentially
+  // harmles duplication of live local objects. Kernel will
+  // return the exact same data pointer and vtable pointer
+  //
+  // There also duplication on kernel side too but again harmless
+  // just... not worth it to try fix .w. or even impossible
+  // so just live with it :(
   local_objects: Mutex<HashSet<ByAddress<Arc<dyn BinderObject<ContextManager>>>>>,
   _binder_buffer: MmapRegion
 }
