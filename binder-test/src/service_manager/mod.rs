@@ -13,8 +13,8 @@ impl ContextManager {
   }
 }
 
-impl BinderObject for ContextManager {
-  fn on_packet(&self, _runtime: &Runtime<dyn BinderObject>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
+impl BinderObject<ContextManager> for ContextManager {
+  fn on_packet(&self, _runtime: &Runtime<ContextManager>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
     log!("Incoming transaction code: {}", packet.get_code());
     reply_builder.set_code(7875);
     

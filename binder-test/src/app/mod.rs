@@ -1,11 +1,11 @@
 use libbinder::{formats::dead_simple::DeadSimpleFormatReader, packet::builder::PacketBuilder};
 use libbinder_raw::CONTEXT_MANAGER_REF;
-use libbinder_runtime::{Runtime, binder_object::RemoteBinderObject};
+use libbinder_runtime::{Runtime, binder_object::GenericContextManager};
 
 use crate::common::log;
 
 pub fn main() {
-  let runtime = Runtime::<RemoteBinderObject>::new().ok().unwrap();
+  let runtime = Runtime::<GenericContextManager>::new().ok().unwrap();
   nix::unistd::sleep(1);
   
   let response = runtime.send_packet(
