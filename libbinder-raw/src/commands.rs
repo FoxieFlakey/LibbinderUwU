@@ -1,5 +1,5 @@
-use std::mem;
-
+use bytemuck::{Pod, Zeroable};
+use bytemuck_utils::PodData;
 use nix::{request_code_none, request_code_read, request_code_write};
 use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 
@@ -26,6 +26,7 @@ impl Command {
 
 const BINDER_RET_MAGIC: u8 = b'r';
 
+#[derive(Pod, Zeroable, Clone, Copy)]
 #[repr(C)]
 pub struct PtrCookieRaw {
   pub ptr: BinderUsize,
@@ -36,10 +37,7 @@ impl PtrCookieRaw {
   // Unaligned read does not matter
   // any bit pattern is correct
   pub fn from_raw_bytes(bytes: &[u8]) -> PtrCookieRaw {
-    let mut ret = [0u8; size_of::<PtrCookieRaw>()];
-    ret.copy_from_slice(bytes);
-    // All bit pattern of 'ret' is safe for PtrCookieRaw
-    unsafe { mem::transmute::<[u8; 16], PtrCookieRaw>(ret) }
+    PodData::unwrap(PodData::make_sure_owned(PodData::<PtrCookieRaw>::from_bytes(bytes)))
   }
 }
 

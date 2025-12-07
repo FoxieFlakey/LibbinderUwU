@@ -3,6 +3,8 @@ resolver = "3"
 members = [
   "libbinder",
   "libbinder-raw",
-  "binder-test"
-, "libbinder-runtime"]
+  "binder-test",
+  "libbinder-runtime",
+  "bytemuck-utils"
+]
 

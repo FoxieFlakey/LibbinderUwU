@@ -3,6 +3,7 @@
 
 use std::os::fd::{AsRawFd, BorrowedFd};
 
+use bytemuck::{Pod, Zeroable};
 use nix::errno::Errno;
 
 mod object_ref;
@@ -18,14 +19,14 @@ pub use write_read::binder_read_write;
 
 // Equivalent to struct binder_version
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Pod, Zeroable)]
 pub struct Version {
   pub version: i32
 }
 
 // Equivalent to struct binder_object_header
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Copy, Clone, Pod, Zeroable)]
 pub struct ObjectHeader {
   kind: u32
 }
@@ -57,7 +58,6 @@ pub const BINDER_COMPILED_VERSION: Version = Version {
 pub fn binder_set_context_mgr(fd: BorrowedFd, manager_object: &ObjectRefLocal) -> Result<(), Errno> {
   let mut obj_ref = manager_object.into_raw();
   unsafe { ioctl::ioctl_set_context_mgr_ext(fd.as_raw_fd(), &raw mut obj_ref) }?;
-  drop(obj_ref);
   Ok(())
 }
 

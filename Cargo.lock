@@ -35,6 +35,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytemuck-utils"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "bytemuck_derive"
 version = "1.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -120,6 +127,7 @@ name = "libbinder-raw"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "bytemuck-utils",
  "bytemuck_derive",
  "enumflags2",
  "nix",

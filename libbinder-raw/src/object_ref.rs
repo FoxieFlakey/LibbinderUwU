@@ -1,5 +1,4 @@
-use std::{ptr, slice};
-
+use bytemuck::{Pod, Zeroable};
 use enumflags2::{BitFlag, BitFlags, bitflags};
 
 use crate::{BinderUsize, ObjectHeader, object};
@@ -49,8 +48,7 @@ impl ObjectRef {
       ObjectRef::Remote(x) => x.into_raw()
     };
     
-    let ret = func(unsafe { slice::from_raw_parts(ptr::from_ref(&raw).cast::<u8>(), size_of::<ObjectRefRaw>()) });
-    drop(raw);
+    let ret = func(bytemuck::bytes_of(&raw));
     ret
   }
 }
@@ -105,6 +103,7 @@ impl ObjectRefRemote {
 // not copy the private data referenced by this
 //
 // So can be thought of object reference
+#[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
 pub(crate) struct ObjectRefRaw {
   header: ObjectHeader,
@@ -138,8 +137,11 @@ pub(crate) struct ObjectRefRaw {
 
 // It is a union inside flat_binder_object
 #[repr(C)]
+#[derive(Copy, Clone, Zeroable)]
 union BinderOrHandleUnion {
   binder: BinderUsize,
   handle: u32
 }
+
+unsafe impl Pod for BinderOrHandleUnion {}
 

@@ -1,5 +1,6 @@
 use std::{os::fd::BorrowedFd, slice, sync::Arc};
 
+use bytemuck_utils::PodData;
 use enumflags2::BitFlags;
 use nix::errno::Errno;
 
@@ -105,25 +106,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
       panic!("Size of the 'bytes' is not same the size of binder_transaction_data ({} bytes)", BYTES_NEEDED_FOR_FROM_BYTES);
     }
     
-    let temp;
-    let aligned = if bytes.as_ptr().addr().is_multiple_of(align_of::<TransactionDataRaw>()) {
-        bytes
-      } else {
-        let mut aligned = Vec::<u8>::new();
-        aligned.resize(bytes.len() + align_of::<TransactionDataRaw>(), 0);
-        let offset = if aligned.as_ptr().addr().is_power_of_two() {
-            0
-          } else {
-            aligned.as_ptr().addr().next_multiple_of(align_of::<TransactionDataRaw>()) - aligned.as_ptr().addr()
-          };
-        aligned[offset..offset + BYTES_NEEDED_FOR_FROM_BYTES].copy_from_slice(bytes);
-        temp = aligned;
-        &temp[offset..BYTES_NEEDED_FOR_FROM_BYTES]
-      };
-    
-    assert!(aligned.len() == BYTES_NEEDED_FOR_FROM_BYTES);
-    
-    let raw = bytemuck::from_bytes::<TransactionDataRaw>(aligned);
+    let raw = PodData::<TransactionDataRaw>::from_bytes(bytes);
     
     // SAFETY: The buffers data as far as 'static concerned lives longer
     // before the 'static reference gone
