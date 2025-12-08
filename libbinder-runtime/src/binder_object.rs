@@ -35,7 +35,7 @@ impl<ContextManager: BinderObject<ContextManager>> ConreteObjectFromRemote<Conte
   }
 }
 
-// This does increments the strong count
+// This does not increments the strong count
 // SAFETY: Caller must make sure local reference points to correct object
 pub(crate) unsafe fn from_local_object_ref<ContextManager: BinderObject<ContextManager>>(object_ref: &ObjectRefLocal) -> Arc<dyn BinderObject<ContextManager>> {
   let raw = ptr::from_raw_parts::<dyn BinderObject<ContextManager>>(

@@ -4,7 +4,7 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{collections::HashSet, io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, Mutex, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
+use std::{collections::HashSet, io, marker::PhantomData, mem, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, Mutex, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
 
 use by_address::ByAddress;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
@@ -259,6 +259,9 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
             let reply = obj.on_packet(&runtime, &packet);
             assert!(reply.get_binder_dev().as_raw_fd() == binder_dev.as_raw_fd(), "Attempt to send reply with packet built for other runtime");
             reply.send_as_reply().unwrap();
+            
+            // The from_local_object_ref does not increment the counter
+            mem::forget(obj);
           }
           
           ReturnValue::Release(reference) => {
