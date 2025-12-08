@@ -245,46 +245,45 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
           // Runtime is dead, quit
           break 'poll_loop;
         };
-      ret_buf.get_parsed()
-        .iter()
-        .for_each(|v| {
-          match v {
-            ReturnValue::Noop => (),
-            ReturnValue::Transaction((reference, packet)) => {
-              // SAFETY: Kernel make sure its same pointer as sent
-              // which we mem::forget
-              let obj = unsafe { binder_object::from_local_object_ref(&reference) };
-              
-              obj.on_packet(&runtime, &packet, &mut reply_builder);
-              
-              let reply = reply_builder.build(binder_dev);
-              reply.send_as_reply().unwrap();
-              reply_builder = reply.into();
-            }
+      
+      for v in ret_buf.get_parsed().iter() {
+        match v {
+          ReturnValue::Noop => (),
+          ReturnValue::Transaction((reference, packet)) => {
+            // SAFETY: Kernel make sure its same pointer as sent
+            // which we mem::forget
+            let obj = unsafe { binder_object::from_local_object_ref(&reference) };
             
-            ReturnValue::Release(reference) => {
-              // SAFETY: Kernel make sure its same pointer as sent
-              // which we mem::forget
-              let obj = unsafe { binder_object::from_local_object_ref::<ContextManager>(&reference) };
-              assert!(Arc::ptr_eq(&obj, &ctx_manager), "BR_RELEASE was trigger for context mananger");
-              
-              // Remove from local objects list
-              assert!(shared.local_objects.lock().unwrap().remove(&ByAddress(obj)), "Kernel sent BR_RELEASE on unknown object");
-            }
+            obj.on_packet(&runtime, &packet, &mut reply_builder);
             
-            ReturnValue::Acquire(_) |
-            ReturnValue::AcquireWeak(_) |
-            ReturnValue::ReleaseWeak(_) |
-            ReturnValue::Ok |
-            ReturnValue::Error(_) |
-            ReturnValue::SpawnLooper |
-            ReturnValue::DeadReply |
-            ReturnValue::TransactionComplete |
-            ReturnValue::TransactionFailed |
-            ReturnValue::Reply(_)
-            => unimplemented!()
+            let reply = reply_builder.build(binder_dev);
+            reply.send_as_reply().unwrap();
+            reply_builder = reply.into();
           }
-        });
+          
+          ReturnValue::Release(reference) => {
+            // SAFETY: Kernel make sure its same pointer as sent
+            // which we mem::forget
+            let obj = unsafe { binder_object::from_local_object_ref::<ContextManager>(&reference) };
+            assert!(Arc::ptr_eq(&obj, &ctx_manager), "BR_RELEASE was trigger for context mananger");
+            
+            // Remove from local objects list
+            assert!(shared.local_objects.lock().unwrap().remove(&ByAddress(obj)), "Kernel sent BR_RELEASE on unknown object");
+          }
+          
+          ReturnValue::Acquire(_) |
+          ReturnValue::AcquireWeak(_) |
+          ReturnValue::ReleaseWeak(_) |
+          ReturnValue::Ok |
+          ReturnValue::Error(_) |
+          ReturnValue::SpawnLooper |
+          ReturnValue::DeadReply |
+          ReturnValue::TransactionComplete |
+          ReturnValue::TransactionFailed |
+          ReturnValue::Reply(_)
+          => unimplemented!()
+        }
+      };
     }
   }
   
