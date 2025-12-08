@@ -1,4 +1,6 @@
 #![feature(ptr_metadata)]
+#![feature(unsize)]
+#![feature(coerce_unsized)]
 
 // A runtime, for ease of using libbinder
 // handles details of thread lifecycle and
@@ -11,11 +13,12 @@ use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::Pa
 use libbinder_raw::{binder_set_context_mgr, object::reference::ObjectRefRemote, types::reference::ObjectRef};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
-use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}, packet::PacketBuilder, packet::Packet};
+use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, packet::{Packet, PacketBuilder}, reference::Reference, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
 
 pub mod binder_object;
 pub mod packet;
 pub mod proxy;
+pub mod reference;
 mod util;
 
 struct Shared<ContextManager: BinderObject<ContextManager>> {
@@ -132,8 +135,8 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
 }
 
 impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
-  pub fn get_context_manager(&self) -> &Arc<ContextManager> {
-    self.cached_ctx_manager.get().unwrap()
+  pub fn get_context_manager<'a>(&'a self) -> Reference<'a, ContextManager, ContextManager> {
+    Reference::context_manager(self)
   }
   
   pub fn get_context_manager_object(&self) -> &Arc<dyn BinderObject<ContextManager>> {

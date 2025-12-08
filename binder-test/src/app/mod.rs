@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use libbinder_runtime::Runtime;
+use libbinder_runtime::{Runtime, reference::Reference};
 
 use crate::{common::log, interface::{IAnService, AnServiceProxy}};
 
@@ -14,7 +12,7 @@ pub fn main() {
   
   // It is upcasted to IAnService to show that  concrete
   // type is not need and this is how pattern generally is like
-  let ctx_mgr = runtime.get_context_manager().clone() as Arc<dyn IAnService>;
+  let ctx_mgr = runtime.get_context_manager().clone() as Reference<'_, AnServiceProxy, dyn IAnService>;
   ctx_mgr.bwah_uwu("Meooow this is called from other process UwU");
   let length = ctx_mgr.length_of_string("String");
   log!("Length of string is {length}");

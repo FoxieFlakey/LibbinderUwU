@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use libbinder::formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader};
-use libbinder_runtime::{Runtime, binder_object::BinderObject, packet::Packet};
+use libbinder_runtime::{Runtime, binder_object::BinderObject, packet::Packet, reference::Reference};
 
 use crate::{common::log, interface::{ISERVICE_MANAGER_CODE_BWAH_UWU, ISERVICE_MANAGER_CODE_LENGTH_OF_STRING, ISERVICE_MANAGER_RET_ERR, ISERVICE_MANAGER_RET_OK, IAnService}};
 
@@ -28,7 +28,7 @@ pub fn main() {
   //
   // It is upcasted to IServiceManager to show that  concrete
   // type is not need and this is how pattern generally is like
-  let ctx = runtime.get_context_manager().clone() as Arc<dyn IAnService>; 
+  let ctx = runtime.get_context_manager().clone() as Reference<'_, AnServiceImpl, dyn IAnService>; 
   ctx.bwah_uwu("HI UwU");
   loop { nix::unistd::sleep(1); }
 }
