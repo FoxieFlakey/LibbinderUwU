@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use libbinder::formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader};
-use libbinder_runtime::{Runtime, binder_object::{BinderObject, ConreteObjectFromRemote}, packet::Packet, proxy::ProxyObject};
+use libbinder_runtime::{Runtime, binder_object::{BinderObject, CreateProxyFromRemote}, packet::Packet, proxy::ProxyObject};
 
 pub trait IAnService: Send + Sync {
   fn length_of_string(&self, string: &str) -> usize;
@@ -64,7 +64,7 @@ impl IAnService for AnServiceProxy {
   }
 }
 
-impl ConreteObjectFromRemote<Self> for AnServiceProxy {
+impl CreateProxyFromRemote<Self> for AnServiceProxy {
   fn try_from_remote(runtime: &Arc<Runtime<Self>>, remote_ref: ProxyObject<Self>) -> Result<Self, ()> {
     Ok(Self {
       runtime: runtime.clone(),

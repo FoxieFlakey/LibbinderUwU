@@ -7,7 +7,7 @@ use std::{ffi::CStr, ops::Deref, os::fd::AsRawFd};
 use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
 
-use crate::{Runtime, binder_object::BinderObject};
+use crate::{Runtime, binder_object::BinderObject, reference::Reference};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
@@ -118,7 +118,7 @@ macro_rules! impl_forward {
 
 // NOTE: Cannot provide DerefMut due the underlying packet writer might be replaced
 // by the user when unwanted
-impl<'packet, ContextManager: BinderObject<ContextManager>, Format: WriteFormat<'packet>> PacketWriter<'_, 'packet, ContextManager, Format> {
+impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: WriteFormat<'packet>> PacketWriter<'runtime, 'packet, ContextManager, Format> {
   impl_forward!(write_u8, write_u8_array, write_u8_slice, u8);
   impl_forward!(write_u16, write_u16_array, write_u16_slice, u16);
   impl_forward!(write_u32, write_u32_array, write_u32_slice, u32);

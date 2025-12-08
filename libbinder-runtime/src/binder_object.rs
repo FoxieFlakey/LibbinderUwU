@@ -8,7 +8,7 @@ pub trait BinderObject<ContextManager: BinderObject<ContextManager>>: Sync + Sen
   fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<ContextManager>>, packet: &Packet<'runtime, ContextManager>) -> Packet<'runtime, ContextManager>;
 }
 
-pub trait ConreteObjectFromRemote<ContextManager: BinderObject<ContextManager>>: Sized {
+pub trait CreateProxyFromRemote<ContextManager: BinderObject<ContextManager>>: Sized {
   fn try_from_remote(runtime: &Arc<Runtime<ContextManager>>, remote_ref: ProxyObject<ContextManager>) -> Result<Self, ()>;
 }
 

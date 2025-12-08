@@ -48,7 +48,6 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime,
 }
 
 impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>> {
-  #[expect(unused)]
   pub(crate) fn as_raw_object_ref(&self) -> ObjectRef {
     if let Some(remote) = &self.remote_reference {
       ObjectRef::Remote(remote.obj_ref.clone())
