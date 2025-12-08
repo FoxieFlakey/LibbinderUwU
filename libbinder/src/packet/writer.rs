@@ -89,7 +89,10 @@ impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Fo
   impl_forward!(write_cstr, write_cstr_array, write_cstr_slice, &CStr);
   impl_forward!(write_bool, write_bool_array, write_bool_slice, bool);
   
-  pub fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
+  // The object reference to write has to live as long as the packet itself
+  // or if it get sent out, it has to live indefinitely until kernel issues
+  // BR_RELEASE
+  pub unsafe fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
     if self.result.binder_dev.as_raw_fd() != obj_ref.binder.as_raw_fd() {
       panic!("Attempting to store a reference belonging to other binder device!");
     }
