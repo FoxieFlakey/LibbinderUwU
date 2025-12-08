@@ -66,15 +66,15 @@ impl IAnService for AnServiceProxy {
 
 impl ConreteObjectFromRemote<Self> for AnServiceProxy {
   fn try_from_remote(runtime: &Arc<Runtime<Self>>, remote_ref: ProxyObject<Self>) -> Result<Self, ()> {
-    Ok(AnServiceProxy {
+    Ok(Self {
       runtime: runtime.clone(),
       proxy: remote_ref
     })
   }
 }
 
-impl BinderObject<AnServiceProxy> for AnServiceProxy {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceProxy>>, packet: &Packet<'runtime, AnServiceProxy>) -> Packet<'runtime, AnServiceProxy> {
+impl BinderObject<Self> for AnServiceProxy {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<Self>>, packet: &Packet<'runtime, Self>) -> Packet<'runtime, Self> {
     self.proxy.on_packet(runtime, packet)
   }
 }

@@ -25,16 +25,16 @@ impl<ContextManager: BinderObject<ContextManager>> BinderObject<ContextManager> 
 }
 
 pub struct GenericContextManager {
-  proxy: ProxyObject<GenericContextManager>
+  proxy: ProxyObject<Self>
 }
 
-impl BinderObject<GenericContextManager> for GenericContextManager {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<GenericContextManager>>, packet: &Packet<'runtime, GenericContextManager>) -> Packet<'runtime, GenericContextManager> {
+impl BinderObject<Self> for GenericContextManager {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<Self>>, packet: &Packet<'runtime, Self>) -> Packet<'runtime, Self> {
     self.proxy.on_packet(runtime, packet)
   }
 }
 
-impl ConreteObjectFromRemote<GenericContextManager> for GenericContextManager {
+impl ConreteObjectFromRemote<Self> for GenericContextManager {
   fn try_from_remote(_runtime: &Arc<Runtime<Self>>, proxy: ProxyObject<Self>) -> Result<Self, ()> {
     Ok(Self {
       proxy

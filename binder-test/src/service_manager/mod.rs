@@ -36,8 +36,8 @@ pub fn main() {
 // Possibly can be generated at compile time  doesn't need to
 // hardcode. This handles the coming calls, parse and dispatch it
 // to the actual implementation
-impl BinderObject<AnServiceImpl> for AnServiceImpl {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceImpl>>, packet: &Packet<'runtime, AnServiceImpl>) -> Packet<'runtime, AnServiceImpl> {
+impl BinderObject<Self> for AnServiceImpl {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<Self>>, packet: &Packet<'runtime, Self>) -> Packet<'runtime, Self> {
     let mut reply_builder = runtime.new_packet_builder();
     reply_builder.set_code(ISERVICE_MANAGER_RET_OK);
     match packet.get_code() {
