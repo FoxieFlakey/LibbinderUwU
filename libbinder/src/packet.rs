@@ -1,9 +1,9 @@
 use std::{io, mem, os::fd::BorrowedFd};
 
 use enumflags2::BitFlags;
-use libbinder_raw::{object::reference::{ObjectRef, ObjectRefLocal, ObjectRefRemote}, transaction::{Transaction, TransactionFlag, TransactionKernelManaged}};
+use libbinder_raw::{object::reference::{ObjectRef, ObjectRefLocal, ObjectRefRemote}, transaction::{Transaction, TransactionFlag, TransactionKernelManaged}, types::Type};
 
-use crate::{command_buffer::{Command, CommandBuffer}, formats::ReadFormat, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
+use crate::{ObjectRef as ObjectRefWithBinder, command_buffer::{Command, CommandBuffer}, formats::ReadFormat, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
 
 pub mod builder;
 pub mod reader;
@@ -189,6 +189,24 @@ impl<'binder> Packet<'binder> {
       (None, false, false, false) => panic!("did not get any response for transaction from kernel"),
       _ => panic!("ambigious condition, latest_reply.is_some = {latest_reply_is_some}, is_dead = {is_dead}, cant_be_sent = {cant_be_sent}, completed = {completed}")
     }
+  }
+  
+  pub fn iter_references(&self) -> impl Iterator<Item = ObjectRefWithBinder<'binder>> {
+    self.offset_buffer
+      .iter()
+      .map(|&x| {
+        (x, Type::from_bytes(&self.data_buffer[x..Type::bytes_needed()]))
+      })
+      .map(|(offset, obj_ty)| {
+        let bytes = &self.data_buffer[offset..obj_ty.type_size_with_header()];
+        match obj_ty {
+          Type::LocalReference | Type::RemoteReference => {
+            ObjectRef::try_from_bytes(bytes).unwrap()
+          }
+          _ => panic!("unexpected")
+        }
+      })
+      .map(|x| ObjectRefWithBinder::new(self.binder_dev, x))
   }
   
   // If the transaction doesn't result anything. None is retured

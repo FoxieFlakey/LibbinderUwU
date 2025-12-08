@@ -8,7 +8,7 @@ use std::{collections::HashSet, io, marker::PhantomData, mem, os::fd::{AsFd, AsR
 
 use by_address::ByAddress;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
-use libbinder_raw::{object::reference::ObjectRefRemote, binder_set_context_mgr};
+use libbinder_raw::{binder_set_context_mgr, object::reference::ObjectRefRemote, types::reference::ObjectRef};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
 use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
@@ -193,6 +193,30 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   
   pub fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a>) -> Result<Packet<'a>, PacketSendError> {
     assert!(self.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
+    
+    // Make sure know all the local objects that was sent outside
+    packet.iter_references()
+      .inspect(|x| assert!(x.get_binder().as_raw_fd() == self.shared.binder_dev.as_raw_fd(), "attempting to send local object belonging to other runtime"))
+      .flat_map(|reference| match reference.get_reference() {
+        // Is out problem
+        ObjectRef::Local(x) => Some(x.clone()),
+        
+        // Not our problem
+        ObjectRef::Remote(_) => None
+      })
+      .for_each(|reference| {
+        let arc_ref: Arc<dyn BinderObject<ContextManager>> = unsafe { binder_object::from_local_object_ref(&reference) };
+        
+        let was_succesfully_inserted = self.shared.local_objects.lock()
+          .unwrap()
+          .insert(ByAddress(arc_ref.clone()));
+        
+        if was_succesfully_inserted {
+          // It doesn't exist, lets leak a reference which means kernel referencing it
+          mem::forget(arc_ref);
+        }
+      });
+    
     packet.send(target)
   }
   

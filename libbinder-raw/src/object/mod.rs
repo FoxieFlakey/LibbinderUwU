@@ -22,6 +22,7 @@ pub(crate)  const PTR: u32 = pack_chars(b'p', b't', b'*', TYPE_LARGE);
 
 pub mod reference;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Type {
   RemoteReference,
   LocalReference,
