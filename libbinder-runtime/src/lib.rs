@@ -139,6 +139,18 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   }
 }
 
+impl<ContextManager: BinderObject<ContextManager>> Drop for Shared<ContextManager> {
+  fn drop(&mut self) {
+    for reference in self.local_objects.get_mut().unwrap().drain() {
+      let reference = reference.0;
+      
+      // SAFETY: This is a decrement needed because there +1 reference from kernel
+      // if the reference in this hashmap
+      unsafe { Arc::decrement_strong_count(Arc::as_ptr(&reference)) };
+    }
+  }
+}
+
 impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   fn new_impl() -> Result<Arc<Self>, RuntimeCreateError> {
     let (rd, wr) = nix::unistd::pipe()
@@ -261,6 +273,7 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
             reply.send_as_reply().unwrap();
             
             // The from_local_object_ref does not increment the counter
+            // and don't want to lose reference to it yet
             mem::forget(obj);
           }
           
@@ -270,7 +283,8 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
             let obj = unsafe { binder_object::from_local_object_ref::<ContextManager>(&reference) };
             assert!(Arc::ptr_eq(&obj, &ctx_manager), "BR_RELEASE was trigger for context mananger");
             
-            // Remove from local objects list
+            // Remove from local objects list and does not mem::forget the obj to also remove reference
+            // from kernel
             assert!(shared.local_objects.lock().unwrap().remove(&ByAddress(obj)), "Kernel sent BR_RELEASE on unknown object");
           }
           
