@@ -38,7 +38,7 @@ impl IAnService for AnServiceProxy {
       .write_str(data);
     builder.set_code(ISERVICE_MANAGER_CODE_BWAH_UWU);
     
-    let response = self.runtime.send_packet(self.remote_ref.clone(), &builder.build()).unwrap();
+    let response = self.on_packet(&self.runtime, &builder.build());
     assert!(response.get_code() == ISERVICE_MANAGER_RET_OK || response.get_code() == ISERVICE_MANAGER_RET_ERR);
     
     if response.get_code() == ISERVICE_MANAGER_RET_ERR {
@@ -52,7 +52,7 @@ impl IAnService for AnServiceProxy {
       .write_str(string);
     builder.set_code(ISERVICE_MANAGER_CODE_LENGTH_OF_STRING);
     
-    let response = self.runtime.send_packet(self.remote_ref.clone(), &builder.build()).unwrap();
+    let response = self.on_packet(&self.runtime, &builder.build());
     assert!(response.get_code() == ISERVICE_MANAGER_RET_OK || response.get_code() == ISERVICE_MANAGER_RET_ERR);
     
     if response.get_code() == ISERVICE_MANAGER_RET_ERR {
