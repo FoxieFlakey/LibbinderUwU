@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use bytemuck_utils::PodData;
 use enumflags2::{BitFlag, BitFlags, bitflags};
 
 use crate::{BinderUsize, object::{self, ObjectHeaderRaw}};
@@ -42,6 +43,28 @@ pub enum ObjectRef {
 }
 
 impl ObjectRef {
+  pub fn size_in_bytes_for_raw() -> usize {
+    size_of::<ObjectRefRaw>()
+  }
+  
+  pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
+    let obj_type = object::Type::from_bytes(bytes);
+    let raw = PodData::<ObjectRefRaw>::from_bytes(bytes);
+    match obj_type {
+      object::Type::LocalReference => Ok(ObjectRef::Local(ObjectRefLocal {
+        // SAFETY: It is binder type :3
+        data: unsafe { raw.binder_or_handle.binder },
+        extra_data: raw.extra_data
+      })),
+      object::Type::RemoteReference => Ok(ObjectRef::Remote(ObjectRefRemote {
+        // SAFETY: It is handle type :3
+        data_handle: unsafe { raw.binder_or_handle.handle },
+      })),
+      
+      _ => panic!("ObjectRef only need to handle BINDER and HANDLE nothing else")
+    }
+  }
+  
   pub fn with_raw_bytes<R, F: FnOnce(&[u8]) -> R>(&self, func: F) -> R {
     let raw = match self {
       ObjectRef::Local(x) => x.into_raw(),

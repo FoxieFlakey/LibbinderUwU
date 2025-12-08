@@ -1,9 +1,11 @@
 use std::ffi::CStr;
 
+use libbinder_raw::types::{Type, reference::ObjectRef as ObjectRefRaw};
+
 use crate::{formats::{InnerReader, ReadFormat, SliceReadResult}, packet::Packet};
 
 #[derive(Clone)]
-pub struct Reader<'packet, Format: ReadFormat<'packet>> {
+pub struct Reader<'packet, 'binder, Format: ReadFormat<'packet>> {
   // There two instance of format
   // the 'format' is the current one
   // while 'saved_format' is saved one before
@@ -12,12 +14,11 @@ pub struct Reader<'packet, Format: ReadFormat<'packet>> {
   
   format: Format,
   saved_format: Format,
-  packet: &'packet Packet<'packet>
+  packet: &'packet Packet<'binder>
 }
 
 #[derive(Clone)]
 struct ReaderState<'packet> {
-  #[expect(unused)]
   packet: &'packet Packet<'packet>,
   full_slice: &'packet [u8],
   current_slice: &'packet [u8]
@@ -26,12 +27,34 @@ struct ReaderState<'packet> {
 impl ReaderState<'_> {
   // return false if overlaps with binder objects
   // they're cannot be directly read
-  //
-  // currently there no way to write binder objects
   fn check_for_primitive_read_safety(&self, len: usize, is_peeking: Option<usize>) -> bool {
     let current_offset = self.get_cur_offset(is_peeking);
-    #[expect(unused)]
     let offset_range_to_check = current_offset..(current_offset + len);
+    
+    for &offset in self.packet.offset_buffer.iter() {
+      if offset > offset_range_to_check.start {
+        // there no need to go further
+        break;
+      }
+      
+      let Some(header) = self.packet.data_buffer.get(offset..Type::bytes_needed())
+        .map(|x: &[u8]| x.try_into().ok())
+        .flatten()
+      else {
+        // Offset doesn't make sense lets be conservative and assume its not safe
+        return false;
+      };
+      
+      let object_type = Type::from_bytes(header);
+      let size_of_object = object_type.type_size_with_header();
+      let range_occupied = offset..offset+size_of_object;
+      
+      if range_occupied.contains(&offset_range_to_check.start) || range_occupied.contains(&(offset_range_to_check.end - 1)) {
+        // Overlaps with binder objects which is 'not safe' to read
+        return false;
+      }
+    }
+    
     true
   }
   
@@ -74,8 +97,8 @@ impl<'packet> InnerReader<'packet> for ReaderState<'packet> {
   }
 }
 
-impl<'packet, Format: ReadFormat<'packet>> Reader<'packet, Format> {
-  pub fn new(packet: &'packet Packet<'packet>, mut format: Format) -> Self {
+impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, Format> {
+  pub fn new(packet: &'packet Packet<'binder>, mut format: Format) -> Self {
     let data_slice = packet.transaction.get_common().data_slice;
     format.set_reader(Box::new(ReaderState {
       current_slice: data_slice,
@@ -105,7 +128,7 @@ macro_rules! forward {
   };
 }
 
-impl<'packet, Format: ReadFormat<'packet>> Reader<'packet, Format> {
+impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, Format> {
   forward!(read_u8, u8);
   forward!(read_u16, u16);
   forward!(read_u32, u32);
@@ -156,5 +179,21 @@ impl<'packet, Format: ReadFormat<'packet>> Reader<'packet, Format> {
   }
   
   forward!(read_bool_slice, &'packet [bool]);
+  
+  pub fn read_reference(&mut self) -> Result<crate::ObjectRef<'binder>, ()> {
+    let ref_obj = Type::try_from_bytes(self.format.get_reader().peek(Type::bytes_needed(), 0)?)?;
+    match ref_obj {
+      Type::LocalReference | Type::RemoteReference => {
+        let type_size = ref_obj.type_size_with_header();
+        let bytes = self.format.get_reader().peek(type_size, 0)?;
+        let result = ObjectRefRaw::try_from_bytes(bytes)?;
+        
+        // The data was successfully read, lets just advance the reader state
+        self.format.get_reader().read(type_size).unwrap();
+        Ok(crate::ObjectRef::new(self.packet.binder_dev, result))
+      }
+      _ => Err(())
+    }
+  }
 }
 

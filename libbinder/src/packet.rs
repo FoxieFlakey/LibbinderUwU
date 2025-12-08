@@ -102,7 +102,7 @@ impl<'binder> Packet<'binder> {
     )
   }
   
-  pub fn reader<'packet, Format: ReadFormat<'packet>>(&'packet self, format: Format) -> Reader<'packet, Format> {
+  pub fn reader<'packet, Format: ReadFormat<'packet>>(&'packet self, format: Format) -> Reader<'packet, 'binder, Format> {
     Reader::new(self, format)
   }
   

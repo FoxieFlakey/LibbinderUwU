@@ -1,6 +1,8 @@
 use bytemuck::{Pod, Zeroable};
 use bytemuck_utils::PodData;
 
+use crate::types::reference::{ObjectRefLocal, ObjectRefRemote};
+
 const TYPE_LARGE: u8 = 0x85;
 
 const fn pack_chars(c1: u8, c2: u8, c3: u8, c4: u8) -> u32 {
@@ -33,6 +35,20 @@ pub enum Type {
 impl Type {
   pub fn bytes_needed() -> usize {
     size_of::<ObjectHeaderRaw>()
+  }
+  
+  pub fn from_bytes(bytes: &[u8]) -> Type {
+    Self::try_from_bytes(bytes).unwrap()
+  }
+  
+  // Tells how many bytes needed for given type
+  pub fn type_size_with_header(&self) -> usize {
+    match self {
+      Type::LocalReference => size_of::<ObjectRefLocal>(),
+      Type::RemoteReference => size_of::<ObjectRefRemote>(),
+      
+      _ => todo!()
+    }
   }
   
   pub fn try_from_bytes(bytes: &[u8]) -> Result<Type, ()> {

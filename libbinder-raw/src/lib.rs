@@ -13,6 +13,11 @@ pub mod transaction;
 
 use crate::object::reference::ObjectRefLocal;
 
+pub mod types {
+  use crate::object;
+  pub use object::*;
+}
+
 // Equivalent to struct binder_version
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Pod, Zeroable)]
