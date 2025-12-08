@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::{Packet, builder::PacketBuilder}};
+use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::Packet};
 use libbinder_runtime::{Runtime, binder_object::BinderObject};
 
 use crate::{common::log, interface::{ISERVICE_MANAGER_CODE_BWAH_UWU, ISERVICE_MANAGER_CODE_LENGTH_OF_STRING, ISERVICE_MANAGER_RET_ERR, ISERVICE_MANAGER_RET_OK, IAnService}};
@@ -37,7 +37,8 @@ pub fn main() {
 // hardcode. This handles the coming calls, parse and dispatch it
 // to the actual implementation
 impl BinderObject<AnServiceImpl> for AnServiceImpl {
-  fn on_packet(&self, _runtime: &Arc<Runtime<AnServiceImpl>>, packet: &Packet<'_>, reply_builder: &mut PacketBuilder) {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceImpl>>, packet: &Packet<'runtime>) -> Packet<'runtime> {
+    let mut reply_builder = runtime.new_packet_builder();
     reply_builder.set_code(ISERVICE_MANAGER_RET_OK);
     match packet.get_code() {
       ISERVICE_MANAGER_CODE_LENGTH_OF_STRING => {
@@ -46,7 +47,7 @@ impl BinderObject<AnServiceImpl> for AnServiceImpl {
           reply_builder.set_code(ISERVICE_MANAGER_RET_ERR)
             .writer(DeadSimpleFormat::new())
             .write_str("invalid string");
-          return;
+          return reply_builder.build();
         };
         
         let len = self.length_of_string(data);
@@ -59,7 +60,7 @@ impl BinderObject<AnServiceImpl> for AnServiceImpl {
           reply_builder.set_code(ISERVICE_MANAGER_RET_ERR)
             .writer(DeadSimpleFormat::new())
             .write_str("invalid string");
-          return;
+          return reply_builder.build();
         };
         self.bwah_uwu(data);
       }
@@ -70,6 +71,8 @@ impl BinderObject<AnServiceImpl> for AnServiceImpl {
           .write_str("unknown transaction code");
       }
     }
+    
+    reply_builder.build()
   }
 }
 

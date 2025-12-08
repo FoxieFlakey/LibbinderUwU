@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::{Packet, PacketSendError, builder::PacketBuilder}};
+use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::{Packet, PacketSendError}};
 use libbinder_raw::{object::reference::ObjectRefRemote};
 use libbinder_runtime::{Runtime, binder_object::{BinderObject, ConreteObjectFromRemote}};
 
@@ -33,12 +33,12 @@ impl AnServiceProxy {
 
 impl IAnService for AnServiceProxy {
   fn bwah_uwu(&self, data: &str) {
-    let mut builder = PacketBuilder::new();
+    let mut builder = self.runtime.new_packet_builder();
     builder.writer(DeadSimpleFormat::new())
       .write_str(data);
     builder.set_code(ISERVICE_MANAGER_CODE_BWAH_UWU);
     
-    let response = self.runtime.send_packet(self.remote_ref.clone(), &builder.build(self.runtime.get_binder())).unwrap();
+    let response = self.runtime.send_packet(self.remote_ref.clone(), &builder.build()).unwrap();
     assert!(response.get_code() == ISERVICE_MANAGER_RET_OK || response.get_code() == ISERVICE_MANAGER_RET_ERR);
     
     if response.get_code() == ISERVICE_MANAGER_RET_ERR {
@@ -47,12 +47,12 @@ impl IAnService for AnServiceProxy {
   }
   
   fn length_of_string(&self, string: &str) -> usize {
-    let mut builder = PacketBuilder::new();
+    let mut builder = self.runtime.new_packet_builder();
     builder.writer(DeadSimpleFormat::new())
       .write_str(string);
     builder.set_code(ISERVICE_MANAGER_CODE_LENGTH_OF_STRING);
     
-    let response = self.runtime.send_packet(self.remote_ref.clone(), &builder.build(self.runtime.get_binder())).unwrap();
+    let response = self.runtime.send_packet(self.remote_ref.clone(), &builder.build()).unwrap();
     assert!(response.get_code() == ISERVICE_MANAGER_RET_OK || response.get_code() == ISERVICE_MANAGER_RET_ERR);
     
     if response.get_code() == ISERVICE_MANAGER_RET_ERR {
@@ -75,9 +75,9 @@ impl ConreteObjectFromRemote<AnServiceProxy> for AnServiceProxy {
 }
 
 impl BinderObject<AnServiceProxy> for AnServiceProxy {
-  fn on_packet(&self, runtime: &Arc<Runtime<AnServiceProxy>>, packet: &libbinder::packet::Packet<'_>, reply_builder: &mut libbinder::packet::builder::PacketBuilder) {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceProxy>>, packet: &Packet<'runtime>) -> Packet<'runtime> {
     match runtime.send_packet(self.remote_ref.clone(), packet) {
-      Ok(reply) => *reply_builder = reply.into(),
+      Ok(reply) => reply,
       Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
       Err(e) => panic!("Error occur while proxying to remote object: {e:#?}")
     }

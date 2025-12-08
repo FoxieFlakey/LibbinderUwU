@@ -175,13 +175,17 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     }))
   }
   
-  pub fn get_binder<'a>(&'a self) -> BorrowedFd<'a> {
+  pub(crate) fn get_binder<'a>(&'a self) -> BorrowedFd<'a> {
     self.shared.binder_dev.as_fd()
   }
   
   pub fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a>) -> Result<Packet<'a>, PacketSendError> {
     assert!(self.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
     packet.send(target)
+  }
+  
+  pub fn new_packet_builder<'a>(&'a self) -> PacketBuilder<'a> {
+    PacketBuilder::new(self.get_binder())
   }
 }
 
@@ -210,7 +214,6 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
     .unwrap();
   
   let mut ret_buf = ReturnBuffer::new(binder_dev, 4096);
-  let mut reply_builder = PacketBuilder::new();
   'poll_loop: loop {
     let mut fds = [
       PollFd::new(shutdown_pipe_rd.as_fd(), PollFlags::POLLIN),
@@ -253,12 +256,9 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
             // SAFETY: Kernel make sure its same pointer as sent
             // which we mem::forget
             let obj = unsafe { binder_object::from_local_object_ref(&reference) };
-            
-            obj.on_packet(&runtime, &packet, &mut reply_builder);
-            
-            let reply = reply_builder.build(binder_dev);
+            let reply = obj.on_packet(&runtime, &packet);
+            assert!(reply.get_binder_dev().as_raw_fd() == binder_dev.as_raw_fd(), "Attempt to send reply with packet built for other runtime");
             reply.send_as_reply().unwrap();
-            reply_builder = reply.into();
           }
           
           ReturnValue::Release(reference) => {

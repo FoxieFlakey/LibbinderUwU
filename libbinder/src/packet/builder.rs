@@ -5,20 +5,23 @@ use libbinder_raw::{object::reference::{ObjectRef, ObjectRefRemote}, transaction
 
 use crate::{formats::WriteFormat, packet::{Packet, writer::Writer}};
 
-pub struct PacketBuilder {
+#[derive(Clone)]
+pub struct PacketBuilder<'binder> {
   pub(super) code: Option<u32>,
+  pub(super) binder_dev: BorrowedFd<'binder>,
   pub(super) flags: Option<BitFlags<TransactionFlag>>,
   pub(super) data_buffer: Vec<u8>,
   pub(super) offsets_buffer: Vec<usize>
 }
 
-impl PacketBuilder {
-  pub fn new() -> Self {
+impl<'binder> PacketBuilder<'binder> {
+  pub fn new(binder_dev: BorrowedFd<'binder>) -> Self {
     Self {
       code: None,
       flags: None,
       data_buffer: Vec::new(),
       offsets_buffer: Vec::new(),
+      binder_dev: binder_dev,
     }
   }
   
@@ -41,15 +44,15 @@ impl PacketBuilder {
   
   // NOTE: This implicitly appends to data written
   // by previous writer
-  pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> Writer<'packet, Format> {
+  pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> Writer<'packet, 'binder, Format> {
     Writer::new(self, format)
   }
   
   // After build the builder is 'reset'
   // to state where it starts
-  pub fn build<'binder>(&mut self, binder_dev: BorrowedFd<'binder>) -> Packet<'binder> {
+  pub fn build(&mut self) -> Packet<'binder> {
     Packet {
-      binder_dev,
+      binder_dev: self.binder_dev,
       transaction: Transaction::NotKernelManaged(TransactionNotKernelMananged {
         data: TransactionDataCommon {
           code: self.code.take().expect("code must be given to build a packet"),

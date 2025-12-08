@@ -73,6 +73,11 @@ pub trait ReadFormat<'reader>: Clone {
 pub trait InnerWriter<'writer> {
   fn write(&mut self, bytes: &[u8]);
   fn get_current_offset(&self) -> usize;
+  
+  // The implementation of WriteFormat MUST NOT use this,
+  // this exists so Writer can extract the underlying data
+  // buffer once done using
+  fn get_data_buffer_mut(&mut self) -> &mut Vec<u8>;
 }
 
 pub trait WriteFormat<'writer> {

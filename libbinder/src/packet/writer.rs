@@ -1,38 +1,49 @@
-use std::{ffi::CStr, marker::PhantomData, mem};
+use std::os::fd::AsRawFd;
+use std::{ffi::CStr, mem};
 
-use libbinder_raw::object::reference::ObjectRef;
+use crate::ObjectRef;
 
 use crate::{formats::{InnerWriter, WriteFormat}, packet::builder::PacketBuilder};
 
-pub struct Writer<'packet, Format: WriteFormat<'packet>> {
+pub struct Writer<'packet, 'binder, Format: WriteFormat<'packet>> {
   format: Format,
+  result: &'packet mut PacketBuilder<'binder>,
   offsets: Vec<usize>,
-  _phantom: PhantomData<&'packet ()>
 }
 
-struct WriterState<'builder> {
-  packet: &'builder mut PacketBuilder
+struct WriterState {
+  buffer: Vec<u8>
 }
 
-impl<'builder> InnerWriter<'builder> for WriterState<'builder> {
+impl InnerWriter<'_> for WriterState {
   fn get_current_offset(&self) -> usize {
-    self.packet.data_buffer.len()
+    self.buffer.len()
   }
   
   fn write(&mut self, bytes: &[u8]) {
-    self.packet.data_buffer.extend_from_slice(bytes);
+    self.buffer.extend_from_slice(bytes);
+  }
+  
+  fn get_data_buffer_mut(&mut self) -> &mut Vec<u8> {
+    &mut self.buffer
   }
 }
 
-impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
-  pub(crate) fn new(packet: &'packet mut PacketBuilder, mut format: Format) -> Self {
+impl<'packet, Format: WriteFormat<'packet>> Drop for Writer<'packet, '_, Format> {
+  fn drop(&mut self) {
+    mem::swap(self.format.get_writer().get_data_buffer_mut(), &mut self.result.data_buffer);
+  }
+}
+
+impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Format> {
+  pub(crate) fn new(packet: &'packet mut PacketBuilder<'binder>, mut format: Format) -> Self {
     let offsets = mem::replace(&mut packet.offsets_buffer, Vec::new());
     format.set_writer(Box::new(WriterState {
-      packet
+      buffer: mem::replace(&mut packet.data_buffer, Vec::new())
     }));
     
     Self {
-      _phantom: PhantomData {},
+      result: packet,
       offsets,
       format
     }
@@ -59,7 +70,7 @@ macro_rules! impl_forward {
 }
 
 // The part to handle writes
-impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
+impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Format> {
   impl_forward!(write_u8, write_u8_array, write_u8_slice, u8);
   impl_forward!(write_u16, write_u16_array, write_u16_slice, u16);
   impl_forward!(write_u32, write_u32_array, write_u32_slice, u32);
@@ -79,9 +90,13 @@ impl<'packet, Format: WriteFormat<'packet>> Writer<'packet, Format> {
   impl_forward!(write_bool, write_bool_array, write_bool_slice, bool);
   
   pub fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
+    if self.result.binder_dev.as_raw_fd() != obj_ref.binder.as_raw_fd() {
+      panic!("Attempting to store a reference belonging to other binder device!");
+    }
+    
     let offset = self.format.get_writer().get_current_offset();
     self.offsets.push(offset);
-    obj_ref.with_raw_bytes(|bytes| {
+    obj_ref.reference.with_raw_bytes(|bytes| {
       self.format.get_writer().write(bytes);
     });
   }

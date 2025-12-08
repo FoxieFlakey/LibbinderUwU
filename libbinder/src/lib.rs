@@ -16,8 +16,8 @@ pub mod formats;
 // outside crate cannot break this invariance
 // without using unsafe function
 pub struct ObjectRef<'binder> {
-  binder: BorrowedFd<'binder>,
-  reference: ObjectRefRaw
+  pub(crate) binder: BorrowedFd<'binder>,
+  pub(crate) reference: ObjectRefRaw
 }
 
 impl<'binder> ObjectRef<'binder> {
