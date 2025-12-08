@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::{Packet, PacketSendError}};
+use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::PacketSendError};
 use libbinder_raw::{object::reference::ObjectRefRemote};
-use libbinder_runtime::{Runtime, binder_object::{BinderObject, ConreteObjectFromRemote}};
+use libbinder_runtime::{Runtime, packet::Packet, binder_object::{BinderObject, ConreteObjectFromRemote}};
 
 pub trait IAnService: Send + Sync {
   fn length_of_string(&self, string: &str) -> usize;
@@ -23,7 +23,7 @@ pub struct AnServiceProxy {
 }
 
 impl AnServiceProxy {
-  fn handle_err(&self, packet: &Packet) -> ! {
+  fn handle_err<ContextMananger: BinderObject<ContextMananger>>(&self, packet: &Packet<ContextMananger>) -> ! {
     assert!(packet.get_code() == ISERVICE_MANAGER_RET_ERR);
     let err_msg = packet.reader(DeadSimpleFormatReader::new()).read_str()
       .expect("Error reading error message");
@@ -75,7 +75,7 @@ impl ConreteObjectFromRemote<AnServiceProxy> for AnServiceProxy {
 }
 
 impl BinderObject<AnServiceProxy> for AnServiceProxy {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceProxy>>, packet: &Packet<'runtime>) -> Packet<'runtime> {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceProxy>>, packet: &Packet<'runtime, AnServiceProxy>) -> Packet<'runtime, AnServiceProxy> {
     match runtime.send_packet(self.remote_ref.clone(), packet) {
       Ok(reply) => reply,
       Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),

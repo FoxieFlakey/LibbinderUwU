@@ -1,12 +1,12 @@
 use std::{mem, ptr::{self, DynMetadata}, sync::Arc};
 
-use libbinder::packet::{Packet, PacketSendError};
+use libbinder::packet::PacketSendError;
 use libbinder_raw::object::reference::{ObjectRefLocal, ObjectRefRemote};
 
-use crate::Runtime;
+use crate::{Runtime, packet::Packet};
 
 pub trait BinderObject<ContextManager: BinderObject<ContextManager>>: Sync + Send + 'static {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<ContextManager>>, packet: &Packet<'runtime>) -> Packet<'runtime>;
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<ContextManager>>, packet: &Packet<'runtime, ContextManager>) -> Packet<'runtime, ContextManager>;
 }
 
 pub struct GenericContextManager {
@@ -18,7 +18,7 @@ pub trait ConreteObjectFromRemote<ContextManager: BinderObject<ContextManager>>:
 }
 
 impl BinderObject<GenericContextManager> for GenericContextManager {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<GenericContextManager>>, packet: &Packet<'runtime>) -> Packet<'runtime> {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<GenericContextManager>>, packet: &Packet<'runtime, GenericContextManager>) -> Packet<'runtime, GenericContextManager> {
     match runtime.send_packet(self.remote_ref.clone(), packet) {
       Ok(reply) => reply,
       Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),

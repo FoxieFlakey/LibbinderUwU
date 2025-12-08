@@ -7,13 +7,14 @@
 use std::{collections::HashSet, io, marker::PhantomData, mem, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, Mutex, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
 
 use by_address::ByAddress;
-use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
+use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::PacketSendError, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::{binder_set_context_mgr, object::reference::ObjectRefRemote, types::reference::ObjectRef};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
-use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
+use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}, packet::PacketBuilder, packet::Packet};
 
 pub mod binder_object;
+pub mod packet;
 mod util;
 
 struct Shared<ContextManager: BinderObject<ContextManager>> {
@@ -191,7 +192,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     self.shared.binder_dev.as_fd()
   }
   
-  pub fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a>) -> Result<Packet<'a>, PacketSendError> {
+  pub fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a, ContextManager>) -> Result<Packet<'a, ContextManager>, PacketSendError> {
     assert!(self.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
     
     // Make sure know all the local objects that was sent outside
@@ -218,10 +219,11 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
       });
     
     packet.send(target)
+      .map(|packet| Packet::new(self, packet))
   }
   
-  pub fn new_packet_builder<'a>(&'a self) -> PacketBuilder<'a> {
-    PacketBuilder::new(self.get_binder())
+  pub fn new_packet_builder<'a>(&'a self) -> PacketBuilder<'a, ContextManager> {
+    PacketBuilder::new(self)
   }
 }
 
@@ -289,6 +291,7 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
         match v {
           ReturnValue::Noop => (),
           ReturnValue::Transaction((reference, packet)) => {
+            let packet = Packet::new(&runtime, packet.clone());
             // SAFETY: Kernel make sure its same pointer as sent
             // which we mem::forget
             let obj = unsafe { binder_object::from_local_object_ref(&reference) };

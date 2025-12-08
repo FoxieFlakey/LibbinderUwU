@@ -42,6 +42,10 @@ impl<'binder> PacketBuilder<'binder> {
     self.code = None;
   }
   
+  pub fn get_binder_dev(&self) -> BorrowedFd<'binder> {
+    self.binder_dev
+  }
+  
   // NOTE: This implicitly appends to data written
   // by previous writer
   pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> Writer<'packet, 'binder, Format> {

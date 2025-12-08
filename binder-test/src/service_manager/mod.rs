@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::Packet};
-use libbinder_runtime::{Runtime, binder_object::BinderObject};
+use libbinder::formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader};
+use libbinder_runtime::{Runtime, binder_object::BinderObject, packet::Packet};
 
 use crate::{common::log, interface::{ISERVICE_MANAGER_CODE_BWAH_UWU, ISERVICE_MANAGER_CODE_LENGTH_OF_STRING, ISERVICE_MANAGER_RET_ERR, ISERVICE_MANAGER_RET_OK, IAnService}};
 
@@ -37,7 +37,7 @@ pub fn main() {
 // hardcode. This handles the coming calls, parse and dispatch it
 // to the actual implementation
 impl BinderObject<AnServiceImpl> for AnServiceImpl {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceImpl>>, packet: &Packet<'runtime>) -> Packet<'runtime> {
+  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceImpl>>, packet: &Packet<'runtime, AnServiceImpl>) -> Packet<'runtime, AnServiceImpl> {
     let mut reply_builder = runtime.new_packet_builder();
     reply_builder.set_code(ISERVICE_MANAGER_RET_OK);
     match packet.get_code() {
