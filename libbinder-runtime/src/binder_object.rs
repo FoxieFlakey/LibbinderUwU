@@ -3,7 +3,7 @@ use std::{mem, ptr::{self, DynMetadata}, sync::Arc};
 use libbinder::packet::PacketSendError;
 use libbinder_raw::object::reference::{ObjectRefLocal, ObjectRefRemote};
 
-use crate::{Runtime, packet::Packet};
+use crate::{Runtime, packet::Packet, proxy::ProxyObject};
 
 pub trait BinderObject<ContextManager: BinderObject<ContextManager>>: Sync + Send + 'static {
   fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<ContextManager>>, packet: &Packet<'runtime, ContextManager>) -> Packet<'runtime, ContextManager>;
@@ -14,7 +14,7 @@ pub struct GenericContextManager {
 }
 
 pub trait ConreteObjectFromRemote<ContextManager: BinderObject<ContextManager>>: Sized {
-  fn try_from_remote(runtime: &Arc<Runtime<ContextManager>>, remote_ref: ObjectRefRemote) -> Result<Self, ()>;
+  fn try_from_remote(runtime: &Arc<Runtime<ContextManager>>, remote_ref: ProxyObject<ContextManager>) -> Result<Self, ()>;
 }
 
 impl BinderObject<GenericContextManager> for GenericContextManager {
@@ -28,9 +28,9 @@ impl BinderObject<GenericContextManager> for GenericContextManager {
 }
 
 impl<ContextManager: BinderObject<ContextManager>> ConreteObjectFromRemote<ContextManager> for GenericContextManager {
-  fn try_from_remote(_runtime: &Arc<Runtime<ContextManager>>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
+  fn try_from_remote(_runtime: &Arc<Runtime<ContextManager>>, remote_ref: ProxyObject<ContextManager>) -> Result<Self, ()> {
     Ok(Self {
-      remote_ref
+      remote_ref: remote_ref.remote_ref
     }) 
   }
 }

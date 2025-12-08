@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::PacketSendError};
-use libbinder_raw::{object::reference::ObjectRefRemote};
-use libbinder_runtime::{Runtime, packet::Packet, binder_object::{BinderObject, ConreteObjectFromRemote}};
+use libbinder::formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader};
+use libbinder_runtime::{Runtime, binder_object::{BinderObject, ConreteObjectFromRemote}, packet::Packet, proxy::ProxyObject};
 
 pub trait IAnService: Send + Sync {
   fn length_of_string(&self, string: &str) -> usize;
@@ -19,7 +18,7 @@ pub const ISERVICE_MANAGER_CODE_BWAH_UWU: u32 = 0x02;
 // on diff process
 pub struct AnServiceProxy {
   runtime: Arc<Runtime<AnServiceProxy>>,
-  remote_ref: ObjectRefRemote
+  proxy: ProxyObject<AnServiceProxy>
 }
 
 impl AnServiceProxy {
@@ -65,22 +64,18 @@ impl IAnService for AnServiceProxy {
   }
 }
 
-impl ConreteObjectFromRemote<AnServiceProxy> for AnServiceProxy {
-  fn try_from_remote(runtime: &Arc<Runtime<AnServiceProxy>>, remote_ref: ObjectRefRemote) -> Result<Self, ()> {
+impl ConreteObjectFromRemote<Self> for AnServiceProxy {
+  fn try_from_remote(runtime: &Arc<Runtime<Self>>, remote_ref: ProxyObject<Self>) -> Result<Self, ()> {
     Ok(AnServiceProxy {
       runtime: runtime.clone(),
-      remote_ref
+      proxy: remote_ref
     })
   }
 }
 
 impl BinderObject<AnServiceProxy> for AnServiceProxy {
   fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<AnServiceProxy>>, packet: &Packet<'runtime, AnServiceProxy>) -> Packet<'runtime, AnServiceProxy> {
-    match runtime.send_packet(self.remote_ref.clone(), packet) {
-      Ok(reply) => reply,
-      Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
-      Err(e) => panic!("Error occur while proxying to remote object: {e:#?}")
-    }
+    self.proxy.on_packet(runtime, packet)
   }
 }
 

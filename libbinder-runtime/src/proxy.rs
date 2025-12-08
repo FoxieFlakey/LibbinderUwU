@@ -9,8 +9,8 @@ use libbinder_raw::types::reference::ObjectRefRemote;
 use crate::{Runtime, binder_object::BinderObject};
 
 pub struct ProxyObject<ContextManager: BinderObject<ContextManager>> {
-  runtime: Arc<Runtime<ContextManager>>,
-  remote_ref: ObjectRefRemote
+  pub(crate) runtime: Arc<Runtime<ContextManager>>,
+  pub(crate) remote_ref: ObjectRefRemote
 }
 
 impl<ContextManager: BinderObject<ContextManager>> BinderObject<ContextManager> for ProxyObject<ContextManager> {

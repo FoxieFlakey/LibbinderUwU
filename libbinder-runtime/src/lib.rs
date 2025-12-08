@@ -13,7 +13,7 @@ use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::Pa
 use libbinder_raw::{binder_set_context_mgr, object::reference::ObjectRefRemote, types::reference::ObjectRef};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
-use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, packet::{Packet, PacketBuilder}, reference::Reference, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
+use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, packet::{Packet, PacketBuilder}, proxy::ProxyObject, reference::Reference, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
 
 pub mod binder_object;
 pub mod packet;
@@ -91,7 +91,7 @@ pub enum RuntimeCreateAsClientError {
 impl<ContextManager: BinderObject<ContextManager> + ConreteObjectFromRemote<ContextManager>> Runtime<ContextManager> {
   pub fn new() -> Result<Arc<Self>, RuntimeCreateAsClientError> {
     let rt= Self::new_impl().map_err(RuntimeCreateAsClientError::CommonCreateError)?;
-    let concrete_manager = ContextManager::try_from_remote(&rt, ObjectRefRemote { data_handle: 0 })
+    let concrete_manager = ContextManager::try_from_remote(&rt, ProxyObject { runtime: rt.clone(), remote_ref: ObjectRefRemote { data_handle: 0 } })
       .map(Arc::new)
       .map_err(|_| RuntimeCreateAsClientError::WrongContextManagerType)?;
     *rt.shared.ctx_manager.write().unwrap() = Some(concrete_manager.clone());
@@ -196,7 +196,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     self.shared.binder_dev.as_fd()
   }
   
-  pub fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a, ContextManager>) -> Result<Packet<'a, ContextManager>, PacketSendError> {
+  pub(crate) fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a, ContextManager>) -> Result<Packet<'a, ContextManager>, PacketSendError> {
     assert!(self.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
     
     // Make sure know all the local objects that was sent outside
