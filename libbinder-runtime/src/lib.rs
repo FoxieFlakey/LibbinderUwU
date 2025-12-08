@@ -15,6 +15,7 @@ use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::
 
 pub mod binder_object;
 pub mod packet;
+pub mod proxy;
 mod util;
 
 struct Shared<ContextManager: BinderObject<ContextManager>> {
