@@ -1,7 +1,6 @@
 use std::{mem, ptr::{self, DynMetadata}, sync::Arc};
 
-use libbinder::packet::PacketSendError;
-use libbinder_raw::object::reference::{ObjectRefLocal, ObjectRefRemote};
+use libbinder_raw::object::reference::ObjectRefLocal;
 
 use crate::{Runtime, packet::Packet, proxy::ProxyObject};
 
@@ -9,30 +8,8 @@ pub trait BinderObject<ContextManager: BinderObject<ContextManager>>: Sync + Sen
   fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<ContextManager>>, packet: &Packet<'runtime, ContextManager>) -> Packet<'runtime, ContextManager>;
 }
 
-pub struct GenericContextManager {
-  remote_ref: ObjectRefRemote
-}
-
 pub trait ConreteObjectFromRemote<ContextManager: BinderObject<ContextManager>>: Sized {
   fn try_from_remote(runtime: &Arc<Runtime<ContextManager>>, remote_ref: ProxyObject<ContextManager>) -> Result<Self, ()>;
-}
-
-impl BinderObject<GenericContextManager> for GenericContextManager {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<GenericContextManager>>, packet: &Packet<'runtime, GenericContextManager>) -> Packet<'runtime, GenericContextManager> {
-    match runtime.send_packet(self.remote_ref.clone(), packet) {
-      Ok(reply) => reply,
-      Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
-      Err(e) => panic!("Error occur while proxying to remote object: {e:#?}")
-    }
-  }
-}
-
-impl<ContextManager: BinderObject<ContextManager>> ConreteObjectFromRemote<ContextManager> for GenericContextManager {
-  fn try_from_remote(_runtime: &Arc<Runtime<ContextManager>>, remote_ref: ProxyObject<ContextManager>) -> Result<Self, ()> {
-    Ok(Self {
-      remote_ref: remote_ref.remote_ref
-    }) 
-  }
 }
 
 // This does not increments the strong count
