@@ -8,7 +8,7 @@ use std::{collections::HashSet, io, marker::PhantomData, os::fd::{AsFd, AsRawFd,
 
 use by_address::ByAddress;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::{Packet, PacketSendError, builder::PacketBuilder}, return_buffer::{ReturnBuffer, ReturnValue}};
-use libbinder_raw::{ObjectRefRemote, binder_set_context_mgr};
+use libbinder_raw::{object::reference::ObjectRefRemote, binder_set_context_mgr};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
 use crate::{binder_object::{BinderObject, ConreteObjectFromRemote}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};

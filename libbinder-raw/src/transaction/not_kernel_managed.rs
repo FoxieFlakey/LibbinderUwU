@@ -1,4 +1,4 @@
-use crate::{ObjectRef, TransactionDataCommon, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
+use crate::{object::reference::ObjectRef, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataCommon, TransactionDataRaw}};
 
 #[derive(Clone)]
 pub struct TransactionNotKernelMananged<'buffer, 'buffer_offsets> {

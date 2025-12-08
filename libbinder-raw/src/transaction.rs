@@ -1,13 +1,12 @@
 use bytemuck::{Pod, Zeroable};
 use enumflags2::{BitFlags, bitflags};
 
-use crate::{BinderUsize, ObjectRef};
+use crate::{BinderUsize, object::reference::ObjectRef};
 
 mod kernel_managed;
 mod not_kernel_managed;
 pub use kernel_managed::TransactionKernelManaged;
 pub use not_kernel_managed::TransactionNotKernelMananged;
-pub use kernel_managed::BYTES_NEEDED_FOR_FROM_BYTES;
 
 #[derive(Clone)]
 pub enum Transaction<'binder, 'buffer, 'buffer_offsets> {

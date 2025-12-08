@@ -1,7 +1,7 @@
 use std::{io, mem, os::fd::BorrowedFd};
 
 use enumflags2::BitFlags;
-use libbinder_raw::{ObjectRef, ObjectRefLocal, ObjectRefRemote, Transaction, TransactionFlag, TransactionKernelManaged};
+use libbinder_raw::{object::reference::{ObjectRef, ObjectRefLocal, ObjectRefRemote}, transaction::{Transaction, TransactionFlag, TransactionKernelManaged}};
 
 use crate::{command_buffer::{Command, CommandBuffer}, formats::ReadFormat, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
 

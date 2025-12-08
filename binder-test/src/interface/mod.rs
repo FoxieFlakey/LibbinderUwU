@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use libbinder::{formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::{Packet, PacketSendError, builder::PacketBuilder}};
-use libbinder_raw::ObjectRefRemote;
+use libbinder_raw::{object::reference::ObjectRefRemote};
 use libbinder_runtime::{Runtime, binder_object::{BinderObject, ConreteObjectFromRemote}};
 
 pub trait IAnService: Send + Sync {

@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use enumflags2::{BitFlag, BitFlags, bitflags};
 
-use crate::{BinderUsize, ObjectHeader, object};
+use crate::{BinderUsize, object::{self, ObjectHeaderRaw}};
 
 #[bitflags]
 #[repr(u32)]
@@ -70,7 +70,7 @@ pub const CONTEXT_MANAGER_REF: ObjectRefRemote = ObjectRefRemote { data_handle: 
 impl ObjectRefLocal {
   pub(crate) fn into_raw(&self) -> ObjectRefRaw {
     ObjectRefRaw {
-      header: ObjectHeader {
+      header: ObjectHeaderRaw {
         kind: object::BINDER
       },
       flags: 0,
@@ -85,7 +85,7 @@ impl ObjectRefLocal {
 impl ObjectRefRemote {
   pub(crate) fn into_raw(&self) -> ObjectRefRaw {
     ObjectRefRaw {
-      header: ObjectHeader {
+      header: ObjectHeaderRaw {
         kind: object::HANDLE
       },
       flags: 0,
@@ -106,7 +106,7 @@ impl ObjectRefRemote {
 #[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
 pub(crate) struct ObjectRefRaw {
-  header: ObjectHeader,
+  header: ObjectHeaderRaw,
   flags: u32,
   binder_or_handle: BinderOrHandleUnion,
   

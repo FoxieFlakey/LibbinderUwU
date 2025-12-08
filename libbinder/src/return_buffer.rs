@@ -1,6 +1,6 @@
 use std::os::fd::BorrowedFd;
 
-use libbinder_raw::{BYTES_NEEDED_FOR_FROM_BYTES, ObjectRefLocal, PtrCookieRaw, ReturnVal};
+use libbinder_raw::{commands::{PtrCookieRaw, ReturnVal}, object::reference::ObjectRefLocal, transaction::TransactionKernelManaged};
 
 use crate::packet::Packet;
 
@@ -53,18 +53,19 @@ impl<'binder> ReturnBuffer<'binder> {
     while current.len() != 0 {
       let val_tag = ReturnVal::try_from_bytes(current[..RETVAL_SIZE].try_into().unwrap()).unwrap();
       
+      let transaction_size = TransactionKernelManaged::bytes_needed();
       let val = match val_tag {
         ReturnVal::Noop => ReturnValue::Noop,
         ReturnVal::Reply => {
-          let bytes = &current[RETVAL_SIZE..RETVAL_SIZE+BYTES_NEEDED_FOR_FROM_BYTES];
+          let bytes = &current[RETVAL_SIZE..RETVAL_SIZE+transaction_size];
           let (_, packet) = unsafe { Packet::from_bytes(self.binder_dev, bytes, true) };
-          current = &current[BYTES_NEEDED_FOR_FROM_BYTES..];
+          current = &current[transaction_size..];
           ReturnValue::Reply(packet)
         },
         ReturnVal::Transaction => {
-          let bytes = &current[RETVAL_SIZE..RETVAL_SIZE+BYTES_NEEDED_FOR_FROM_BYTES];
+          let bytes = &current[RETVAL_SIZE..RETVAL_SIZE+transaction_size];
           let packet = unsafe { Packet::from_bytes(self.binder_dev, bytes, false) };
-          current = &current[BYTES_NEEDED_FOR_FROM_BYTES..];
+          current = &current[transaction_size..];
           ReturnValue::Transaction((packet.0.unwrap(), packet.1))
         },
         ReturnVal::Error => {

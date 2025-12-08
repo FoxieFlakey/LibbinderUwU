@@ -4,7 +4,7 @@ use bytemuck_utils::PodData;
 use enumflags2::BitFlags;
 use nix::errno::Errno;
 
-use crate::{BinderUsize, Command, ObjectRef, ObjectRefLocal, ObjectRefRemote, TransactionDataCommon, binder_read_write, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataRaw}};
+use crate::{BinderUsize, ObjectRefLocal, commands::Command, object::reference::{ObjectRef, ObjectRefRemote}, transaction::{BinderOrHandleUnion, BufferStruct, DataUnion, TransactionDataCommon, TransactionDataRaw}, write_read::binder_read_write};
 
 struct KernelBuffer<'binder> {
   binder_dev: BorrowedFd<'binder>,
@@ -40,8 +40,6 @@ pub struct TransactionKernelManaged<'binder> {
   // the kernel buffer
   _kernel_buf: Arc<KernelBuffer<'binder>>
 }
-
-pub const BYTES_NEEDED_FOR_FROM_BYTES: usize = size_of::<TransactionDataRaw>();
 
 impl<'binder> TransactionKernelManaged<'binder> {
   // Note: We placed fake empty slices, which will be restored
@@ -97,13 +95,17 @@ impl<'binder> TransactionKernelManaged<'binder> {
     &self.data
   }
   
+  pub fn bytes_needed() -> usize {
+    size_of::<TransactionDataRaw>()
+  }
+  
   // SAFETY: The 'bytes' has to be from kernel from the correct binder_dev
   // and the bytes assumed to be from BR_TRANSACTION/BR_REPLY
   //
   // The 'bytes' alignment can be unaligned, and its fine
   pub unsafe fn from_bytes(binder_dev: BorrowedFd<'binder>, bytes: &[u8], is_reply: bool) -> Self {
-    if bytes.len() != BYTES_NEEDED_FOR_FROM_BYTES {
-      panic!("Size of the 'bytes' is not same the size of binder_transaction_data ({} bytes)", BYTES_NEEDED_FOR_FROM_BYTES);
+    if bytes.len() != Self::bytes_needed() {
+      panic!("Size of the 'bytes' is not same the size of binder_transaction_data ({} bytes)", Self::bytes_needed());
     }
     
     let raw = PodData::<TransactionDataRaw>::from_bytes(bytes);

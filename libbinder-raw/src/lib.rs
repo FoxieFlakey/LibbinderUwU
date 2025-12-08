@@ -6,29 +6,18 @@ use std::os::fd::{AsRawFd, BorrowedFd};
 use bytemuck::{Pod, Zeroable};
 use nix::errno::Errno;
 
-mod object_ref;
-mod object;
-mod write_read;
-mod commands;
-mod transaction;
+pub mod object;
+pub mod write_read;
+pub mod commands;
+pub mod transaction;
 
-pub use object_ref::{ObjectRefRemote, ObjectRefLocal, ObjectRefFlags, ObjectRef, CONTEXT_MANAGER_REF};
-pub use commands::{Command, ReturnVal, PtrCookieRaw};
-pub use transaction::{TransactionDataCommon, TransactionKernelManaged, TransactionNotKernelMananged, TransactionFlag, Transaction, BYTES_NEEDED_FOR_FROM_BYTES};
-pub use write_read::binder_read_write;
+use crate::object::reference::ObjectRefLocal;
 
 // Equivalent to struct binder_version
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Pod, Zeroable)]
 pub struct Version {
   pub version: i32
-}
-
-// Equivalent to struct binder_object_header
-#[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
-pub struct ObjectHeader {
-  kind: u32
 }
 
 // TODO: Make sure binder_uintptr_t is correct? somehow detect BINDER_IPC_32BIT
@@ -39,7 +28,7 @@ pub type BinderUsize = usize;
 
 mod ioctl {
   use nix::{ioctl_readwrite, ioctl_write_ptr};
-  use crate::{Version, object_ref::ObjectRefRaw, write_read::ReadWrite};
+  use crate::{Version, object::reference::ObjectRefRaw, write_read::ReadWrite};
   
   const BINDER_IOC_MAGIC: u8  = b'b';
   const BINDER_IOC_TYPE_WRITE_READ: u8 = 1;

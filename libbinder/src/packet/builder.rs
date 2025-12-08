@@ -1,7 +1,7 @@
 use std::{mem, os::fd::BorrowedFd, slice};
 
 use enumflags2::BitFlags;
-use libbinder_raw::{ObjectRef, ObjectRefRemote, Transaction, TransactionDataCommon, TransactionFlag, TransactionNotKernelMananged};
+use libbinder_raw::{object::reference::{ObjectRef, ObjectRefRemote}, transaction::{Transaction, TransactionDataCommon, TransactionFlag, TransactionNotKernelMananged}};
 
 use crate::{formats::WriteFormat, packet::{Packet, writer::Writer}};
 

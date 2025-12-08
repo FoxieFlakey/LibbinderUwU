@@ -1,6 +1,6 @@
 use std::{ffi::CStr, marker::PhantomData, mem};
 
-use libbinder_raw::ObjectRef;
+use libbinder_raw::object::reference::ObjectRef;
 
 use crate::{formats::{InnerWriter, WriteFormat}, packet::builder::PacketBuilder};
 

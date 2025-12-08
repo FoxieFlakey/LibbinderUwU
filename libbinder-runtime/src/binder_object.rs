@@ -1,7 +1,7 @@
 use std::{mem, ptr::{self, DynMetadata}, sync::Arc};
 
 use libbinder::packet::{Packet, PacketSendError, builder::PacketBuilder};
-use libbinder_raw::{ObjectRefLocal, ObjectRefRemote};
+use libbinder_raw::object::reference::{ObjectRefLocal, ObjectRefRemote};
 
 use crate::Runtime;
 
