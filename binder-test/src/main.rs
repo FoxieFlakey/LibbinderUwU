@@ -2,7 +2,7 @@
 
 use std::{fmt::Write, fs::File, os::fd::AsFd, process::exit};
 
-use libbinder_raw::{BINDER_COMPILED_VERSION, binder_version};
+use libbinder_runtime::{BINDER_COMPILED_VERSION, binder_version};
 use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
 mod common;

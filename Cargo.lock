@@ -6,8 +6,6 @@ version = 4
 name = "binder-test"
 version = "0.1.0"
 dependencies = [
- "libbinder",
- "libbinder-raw",
  "libbinder-runtime",
  "nix",
  "process-sync",

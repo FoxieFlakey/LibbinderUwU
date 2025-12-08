@@ -19,6 +19,10 @@ pub mod binder_object;
 pub mod packet;
 pub mod proxy;
 pub mod reference;
+pub use libbinder::formats;
+pub use libbinder_raw::BINDER_COMPILED_VERSION;
+pub use libbinder_raw::Version;
+pub use libbinder_raw::binder_version;
 mod util;
 
 struct Shared<ContextManager: BinderObject<ContextManager>> {

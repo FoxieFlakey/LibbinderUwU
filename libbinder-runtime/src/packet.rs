@@ -7,7 +7,7 @@ use std::{ffi::CStr, ops::Deref, os::fd::AsRawFd};
 use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
 
-use crate::{Runtime, binder_object::BinderObject, reference::Reference};
+use crate::{Runtime, binder_object::BinderObject};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
