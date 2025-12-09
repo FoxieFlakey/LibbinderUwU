@@ -6,7 +6,7 @@ use std::sync::Arc;
 use libbinder::packet::PacketSendError;
 use libbinder_raw::types::reference::ObjectRefRemote;
 
-use crate::{Runtime, binder_object::{BinderObject, CreateProxyFromRemote}, packet::Packet};
+use crate::{Runtime, binder_object::{BinderObject, CreateInterfaceObject}, packet::Packet};
 
 pub struct ProxyObject<ContextManager: BinderObject<ContextManager>> {
   pub(crate) runtime: Arc<Runtime<ContextManager>>,
@@ -34,7 +34,7 @@ impl BinderObject<Self> for GenericContextManager {
   }
 }
 
-impl CreateProxyFromRemote<Self> for GenericContextManager {
+impl CreateInterfaceObject<Self> for GenericContextManager {
   fn try_from_remote(_runtime: &Arc<Runtime<Self>>, proxy: ProxyObject<Self>) -> Result<Self, ()> {
     Ok(Self {
       proxy
