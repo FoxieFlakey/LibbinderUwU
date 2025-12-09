@@ -2,17 +2,18 @@
 // but with extended methods, to ensure
 // safety of object references stored in it
 
-use std::{ffi::CStr, ops::Deref, os::fd::AsRawFd};
+use std::{ffi::CStr, mem, ops::Deref, os::fd::AsRawFd};
 
 use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
 
-use crate::{Runtime, binder_object::BinderObject};
+use crate::{Runtime, binder_object::BinderObject, reference::Reference};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
 pub struct Packet<'runtime, ContextManager: BinderObject<ContextManager>> {
   runtime: &'runtime Runtime<ContextManager>,
+  taken_refs: Vec<Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>>>,
   inner: PacketUnderlying<'runtime>
 }
 
@@ -26,11 +27,13 @@ pub struct PacketReader<'runtime, 'packet, ContextManager: BinderObject<ContextM
 // belong to the same runtime
 pub struct PacketBuilder<'runtime, ContextManager: BinderObject<ContextManager>> {
   runtime: &'runtime Runtime<ContextManager>,
+  taken_refs: Vec<Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>>>,
   inner: PacketBuilderUnderlying<'runtime>
 }
 
 pub struct PacketWriter<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: WriteFormat<'packet>> {
   inner: Writer<'packet, 'runtime, Format>,
+  taken_refs: Vec<Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>>>,
   #[expect(unused)]
   runtime: &'runtime Runtime<ContextManager>
 }
@@ -38,8 +41,12 @@ pub struct PacketWriter<'runtime, 'packet, ContextManager: BinderObject<ContextM
 impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, ContextManager> {
   pub(crate) fn new(runtime: &'runtime Runtime<ContextManager>, packet: PacketUnderlying<'runtime> ) -> Self {
     assert!(runtime.shared.binder_dev.as_raw_fd() == packet.get_binder_dev().as_raw_fd(), "attempting to construct packet using packet belonging to different runtime");
+    let taken_refs = Vec::new();
+    // TODO: Handle reader side to store any references into 'taken_refs'
+    
     Self {
       runtime,
+      taken_refs: taken_refs,
       inner: packet
     }
   }
@@ -48,6 +55,16 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, Co
     PacketReader {
       inner: self.inner.reader(format),
       runtime: self.runtime
+    }
+  }
+}
+
+impl<'runtime, ContextManager: BinderObject<ContextManager>> Into<PacketBuilder<'runtime, ContextManager>> for Packet<'runtime, ContextManager> {
+  fn into(self) -> PacketBuilder<'runtime, ContextManager> {
+    PacketBuilder {
+      runtime: self.runtime,
+      taken_refs: self.taken_refs,
+      inner: self.inner.into()
     }
   }
 }
@@ -64,6 +81,7 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> PacketBuilder<'runt
   pub(crate) fn new(runtime: &'runtime Runtime<ContextManager>) -> Self {
     Self {
       runtime,
+      taken_refs: Vec::new(),
       inner: PacketBuilderUnderlying::new(runtime.get_binder())
     }
   }
@@ -71,6 +89,7 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> PacketBuilder<'runt
   pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> PacketWriter<'runtime, 'packet, ContextManager, Format> {
     PacketWriter {
       inner: self.inner.writer(format),
+      taken_refs: Vec::new(),
       runtime: self.runtime
     }
   }
@@ -91,7 +110,8 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> PacketBuilder<'runt
   }
   
   pub fn build(&mut self) -> Packet<'runtime, ContextManager> {
-    let ret = Packet::new(self.runtime, self.inner.build());
+    let mut ret = Packet::new(self.runtime, self.inner.build());
+    ret.taken_refs = mem::replace(&mut self.taken_refs, Vec::new());
     self.clear();
     ret
   }
@@ -138,6 +158,14 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Wr
   impl_forward!(write_bool, write_bool_array, write_bool_slice, bool);
   
   // Additional extension for writer here
+  pub fn write_obj_ref<T: BinderObject<ContextManager>>(&mut self, reference: Reference<'runtime, ContextManager, T>) {
+    let reference = reference as Reference<'_, ContextManager, dyn BinderObject<ContextManager>>;
+    let raw_ref = reference.as_raw_object_ref();
+    self.taken_refs.push(reference);
+    
+    // Kept the references alive, and the underlying packet builder does not leak
+    unsafe { self.inner.write_obj_ref(raw_ref) };
+  }
 }
 
 macro_rules! forward {
