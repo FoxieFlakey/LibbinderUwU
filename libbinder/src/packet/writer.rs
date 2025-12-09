@@ -1,7 +1,6 @@
-use std::os::fd::AsRawFd;
 use std::{ffi::CStr, mem};
 
-use crate::ObjectRef;
+use libbinder_raw::object::reference::ObjectRef;
 
 use crate::{formats::{InnerWriter, WriteFormat}, packet::builder::PacketBuilder};
 
@@ -91,15 +90,12 @@ impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Fo
   
   // The object reference to write has to live as long as the packet itself
   // or if it get sent out, it has to live indefinitely until kernel issues
-  // BR_RELEASE
+  // BR_RELEASE and need to ensure its correct reference for correct
+  // binder device
   pub unsafe fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
-    if self.result.binder_dev.as_raw_fd() != obj_ref.binder.as_raw_fd() {
-      panic!("Attempting to store a reference belonging to other binder device!");
-    }
-    
     let offset = self.format.get_writer().get_current_offset();
     self.offsets.push(offset);
-    obj_ref.reference.with_raw_bytes(|bytes| {
+    obj_ref.with_raw_bytes(|bytes| {
       self.format.get_writer().write(bytes);
     });
   }

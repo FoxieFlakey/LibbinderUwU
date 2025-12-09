@@ -1,6 +1,6 @@
 use std::ffi::CStr;
 
-use libbinder_raw::types::{Type, reference::ObjectRef as ObjectRefRaw};
+use libbinder_raw::types::{Type, reference::ObjectRef};
 
 use crate::{formats::{InnerReader, ReadFormat, SliceReadResult}, packet::Packet};
 
@@ -180,17 +180,17 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
   
   forward!(read_bool_slice, &'packet [bool]);
   
-  pub fn read_reference(&mut self) -> Result<crate::ObjectRef<'binder>, ()> {
+  pub fn read_reference(&mut self) -> Result<ObjectRef, ()> {
     let ref_obj = Type::try_from_bytes(self.format.get_reader().peek(Type::bytes_needed(), 0)?)?;
     match ref_obj {
       Type::LocalReference | Type::RemoteReference => {
         let type_size = ref_obj.type_size_with_header();
         let bytes = self.format.get_reader().peek(type_size, 0)?;
-        let result = ObjectRefRaw::try_from_bytes(bytes)?;
+        let result = ObjectRef::try_from_bytes(bytes)?;
         
         // The data was successfully read, lets just advance the reader state
         self.format.get_reader().read(type_size).unwrap();
-        Ok(crate::ObjectRef::new(self.packet.binder_dev, result))
+        Ok(result)
       }
       _ => Err(())
     }

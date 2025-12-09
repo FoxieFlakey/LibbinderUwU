@@ -3,7 +3,7 @@ use std::{io, mem, os::fd::BorrowedFd};
 use enumflags2::BitFlags;
 use libbinder_raw::{object::reference::{ObjectRef, ObjectRefLocal, ObjectRefRemote}, transaction::{Transaction, TransactionFlag, TransactionKernelManaged}, types::Type};
 
-use crate::{ObjectRef as ObjectRefWithBinder, command_buffer::{Command, CommandBuffer}, formats::ReadFormat, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
+use crate::{command_buffer::{Command, CommandBuffer}, formats::ReadFormat, packet::{builder::PacketBuilder, reader::Reader}, return_buffer::{ReturnBuffer, ReturnValue}};
 
 pub mod builder;
 pub mod reader;
@@ -191,7 +191,7 @@ impl<'binder> Packet<'binder> {
     }
   }
   
-  pub fn iter_references(&self) -> impl Iterator<Item = ObjectRefWithBinder<'binder>> {
+  pub fn iter_references(&self) -> impl Iterator<Item = ObjectRef> {
     self.offset_buffer
       .iter()
       .map(|&x| {
@@ -206,7 +206,6 @@ impl<'binder> Packet<'binder> {
           _ => panic!("unexpected")
         }
       })
-      .map(|x| ObjectRefWithBinder::new(self.binder_dev, x))
   }
   
   // If the transaction doesn't result anything. None is retured

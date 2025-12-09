@@ -205,8 +205,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     
     // Make sure know all the local objects that was sent outside
     packet.iter_references()
-      .inspect(|x| assert!(x.get_binder().as_raw_fd() == self.shared.binder_dev.as_raw_fd(), "attempting to send local object belonging to other runtime"))
-      .flat_map(|reference| match reference.get_reference() {
+      .flat_map(|reference| match reference {
         // Is out problem
         ObjectRef::Local(x) => Some(x.clone()),
         
