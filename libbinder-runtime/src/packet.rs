@@ -2,14 +2,14 @@
 // but with extended methods, to ensure
 // safety of object references stored in it
 
-use std::{cell::RefCell, ffi::CStr, ops::Deref, os::fd::AsRawFd, rc::Rc, sync::Arc};
+use std::{cell::RefCell, ffi::CStr, marker::PhantomData, ops::Deref, os::fd::AsRawFd, rc::Rc, sync::Arc};
 
 use either::Either;
 use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
 use libbinder_raw::types::reference::ObjectRef;
 
-use crate::{ArcRuntime, binder_object::{self, BinderObject}, reference::{OwnedRemoteRef, Reference}};
+use crate::{ArcRuntime, binder_object::{self, BinderObject, CreateInterfaceObject}, proxy::ProxyObject, reference::{OwnedRemoteRef, Reference}};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
@@ -27,7 +27,7 @@ pub struct Packet<'runtime, ContextManager: BinderObject<ContextManager>> {
 
 pub struct PacketReader<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: ReadFormat<'packet>> {
   inner: Reader<'packet, 'runtime, Format>,
-  #[expect(unused)]
+  packet: &'packet Packet<'runtime, ContextManager>,
   runtime: &'runtime ArcRuntime<ContextManager>
 }
 
@@ -75,6 +75,7 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, Co
   pub fn reader<'packet, Format: ReadFormat<'packet>>(&'packet self, format: Format) -> PacketReader<'runtime, 'packet, ContextManager, Format> {
     PacketReader {
       inner: self.inner.reader(format),
+      packet: self,
       runtime: self.runtime
     }
   }
@@ -201,7 +202,7 @@ macro_rules! forward {
   };
 }
 
-impl<'packet, ContextManager: BinderObject<ContextManager>, Format: ReadFormat<'packet>> PacketReader<'_, 'packet, ContextManager, Format> {
+impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: ReadFormat<'packet>> PacketReader<'runtime, 'packet, ContextManager, Format> {
   forward!(read_u8, u8);
   forward!(read_u16, u16);
   forward!(read_u32, u32);
@@ -236,5 +237,24 @@ impl<'packet, ContextManager: BinderObject<ContextManager>, Format: ReadFormat<'
   forward!(read_f64_slice, SliceReadResult<'packet, f64>);
   
   // Additional extension for reader here
+  pub fn read_obj_ref<T: BinderObject<ContextManager> + CreateInterfaceObject<ContextManager>>(&mut self) -> Result<Reference<'runtime, ContextManager, T>, ()> {
+    let reference = self.packet.refs.binary_search_by_key(&self.inner.get_current_offset(), |x| x.0)
+      .map(|x| &self.packet.refs[x].1)
+      .map_err(|_| ())?;
+    
+    let concrete = match reference {
+      Either::Left(remote) => {
+        T::try_from_remote(self.runtime, ProxyObject { runtime: self.runtime.clone(), remote_ref: remote.clone() })
+          .map(Arc::new)
+          .map_err(|_| ())?
+      },
+      Either::Right(local) => {
+        Arc::downcast::<T>(local.clone())
+          .map_err(|_| ())?
+      }
+    };
+    
+    Ok(Reference { concrete, remote_reference: reference.clone().left(), phantom: PhantomData {} })
+  }
 }
 

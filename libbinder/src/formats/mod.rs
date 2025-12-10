@@ -15,6 +15,7 @@ pub enum SliceReadResult<'reader, T> {
 }
 
 pub trait InnerReader<'reader>: 'reader {
+  fn get_current_offset(&self) -> usize;
   fn clone_reader(&self) -> Box<dyn InnerReader<'reader>>;
   fn peek(&self, size: usize, offset: usize) -> Result<&'reader [u8], ()>;
   fn read(&mut self, size: usize) -> Result<&'reader [u8], ()>;

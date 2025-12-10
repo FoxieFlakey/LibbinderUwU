@@ -78,6 +78,10 @@ impl<'packet> InnerReader<'packet> for ReaderState<'packet> {
     Box::new(self.clone())
   }
   
+  fn get_current_offset(&self) -> usize {
+    self.get_cur_offset(None)
+  }
+  
   fn read(&mut self, size: usize) -> Result<&'packet [u8], ()> {
     if !self.check_for_primitive_read_safety(size, None) {
       return Err(());
@@ -111,6 +115,10 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
       saved_format: format.clone(),
       format
     }
+  }
+  
+  pub fn get_current_offset(&mut self) -> usize {
+    self.format.get_reader().get_current_offset()
   }
   
   pub fn get_packet(&self) -> &'packet Packet<'packet> {

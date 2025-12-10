@@ -20,9 +20,9 @@ impl Drop for OwnedRemoteRef {
 pub struct Reference<'runtime, ContextManager: BinderObject<ContextManager>, T: ?Sized> {
   // Concrete callable object
   // which doesn't have to be implementing BinderObject
-  concrete: Arc<T>,
-  remote_reference: Option<Arc<OwnedRemoteRef>>,
-  phantom: PhantomData<&'runtime Runtime<ContextManager>>
+  pub(crate) concrete: Arc<T>,
+  pub(crate) remote_reference: Option<Arc<OwnedRemoteRef>>,
+  pub(crate) phantom: PhantomData<&'runtime Runtime<ContextManager>>
 }
 
 impl<'runtime, ContextManager: BinderObject<ContextManager>, T: BinderObject<ContextManager> + ?Sized> Clone for Reference<'runtime, ContextManager, T> {
