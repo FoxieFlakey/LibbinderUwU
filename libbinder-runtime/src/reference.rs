@@ -2,7 +2,7 @@ use std::{marker::Unsize, ops::Deref, sync::{Arc, LazyLock}};
 
 use libbinder_raw::types::reference::{ObjectRef, ObjectRefRemote};
 
-use crate::{ArcRuntime, binder_object::{self, BinderObject}};
+use crate::{ArcRuntime, binder_object::{self, BinderObject, CreateInterfaceObject}};
 
 // This calls BC_RELEASE when dropped
 pub struct OwnedRemoteRef {
@@ -65,7 +65,23 @@ impl<ContextManager: BinderObject<ContextManager>> Reference<ContextManager, dyn
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager>, T> Reference<ContextManager, T> {
+impl<ContextManager: BinderObject<ContextManager>, T: Send + Sync + 'static> Reference<ContextManager, T> {
+  pub fn downcast<Target: BinderObject<ContextManager> + CreateInterfaceObject<ContextManager>>(self) -> Result<Reference<ContextManager, Target>, Reference<ContextManager, T>> {
+    let cloned = self.concrete.clone();
+    match Arc::downcast::<Target>(self.concrete) {
+      Ok(concrete) => return Ok(Reference {
+        concrete,
+        remote_reference: self.remote_reference,
+        runtime: self.runtime
+      }),
+      Err(_) => return Err(Reference {
+        concrete: cloned,
+        remote_reference: self.remote_reference,
+        runtime: self.runtime
+      })
+    }
+  }
+  
   pub fn coerce<U: ?Sized>(self) -> Reference<ContextManager, U>
     where T: Unsize<U>
   {
