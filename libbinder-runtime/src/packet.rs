@@ -2,12 +2,12 @@
 // but with extended methods, to ensure
 // safety of object references stored in it
 
-use std::{cell::RefCell, ffi::CStr, ops::Deref, os::fd::AsRawFd, rc::Rc, sync::Arc};
+use std::{cell::RefCell, ffi::CStr, mem, os::fd::{AsRawFd, BorrowedFd}, rc::Rc, sync::Arc};
 
 use either::Either;
 use enumflags2::BitFlags;
-use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
-use libbinder_raw::types::reference::ObjectRef;
+use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, PacketSendError, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
+use libbinder_raw::{transaction::TransactionFlag, types::reference::{ObjectRef, ObjectRefRemote}};
 
 use crate::{ArcRuntime, binder_object::{self, BinderObject, CreateInterfaceObject}, proxy::Object, reference::{OwnedRemoteRef, Reference}};
 
@@ -56,7 +56,9 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, Co
     for (offset, reference) in packet.iter_references() {
       match reference {
         ObjectRef::Local(x) => {
-          refs.push((offset, Either::Right(unsafe { binder_object::from_local_object_ref(&x) })));
+          let arc = unsafe { binder_object::from_local_object_ref(&x) };
+          mem::forget(arc.clone());
+          refs.push((offset, Either::Right(arc)));
         }
         
         ObjectRef::Remote(x) => {
@@ -70,6 +72,38 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, Co
       refs,
       inner: packet
     }
+  }
+  
+  pub fn set_code(&mut self, code: u32) {
+    self.inner.set_code(code);
+  }
+  
+  pub fn set_flags(&mut self, flags: BitFlags<TransactionFlag>) {
+    self.inner.set_flags(flags);
+  }
+  
+  pub fn get_code(&self) -> u32 {
+    self.inner.get_code()
+  }
+  
+  pub fn get_flags(&self) -> BitFlags<TransactionFlag> {
+    self.inner.get_flags()
+  }
+  
+  pub(crate) fn get_binder_dev(&self) -> BorrowedFd<'runtime> {
+    self.inner.get_binder_dev()
+  }
+  
+  pub(crate) fn send_as_reply(&self) -> Result<(), PacketSendError> {
+    self.inner.send_as_reply()
+  }
+  
+  pub(crate) fn send(&self, target: ObjectRefRemote) -> Result<PacketUnderlying<'runtime>, PacketSendError> {
+    self.inner.send(target)
+  }
+  
+  pub(crate) fn iter_references(&self) -> impl Iterator<Item = (usize, ObjectRef)> {
+    self.inner.iter_references()
   }
   
   pub fn reader<'packet, Format: ReadFormat<'packet>>(&'packet self, format: Format) -> PacketReader<'runtime, 'packet, ContextManager, Format> {
@@ -88,14 +122,6 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Into<PacketBuilder<
       refs: Rc::new(RefCell::new(self.refs)),
       inner: self.inner.into()
     }
-  }
-}
-
-impl<'runtime, ContextManager: BinderObject<ContextManager>> Deref for Packet<'runtime, ContextManager> {
-  type Target = PacketUnderlying<'runtime>;
-  
-  fn deref(&self) -> &Self::Target {
-    &self.inner
   }
 }
 
@@ -183,6 +209,10 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Wr
   // Additional extension for writer here
   pub fn write_obj_ref<T: BinderObject<ContextManager>>(&mut self, reference: Reference<ContextManager, T>) {
     let reference = reference.coerce::<dyn BinderObject<ContextManager>>();
+    self.write_obj_ref2(reference);
+  }
+  
+  pub fn write_obj_ref2(&mut self, reference: Reference<ContextManager, dyn BinderObject<ContextManager>>) {
     let offset = self.inner.get_current_offset();
     match reference.get_remote() {
       Some(remote) => self.refs.borrow_mut().push((offset, Either::Left(remote.clone()))),
