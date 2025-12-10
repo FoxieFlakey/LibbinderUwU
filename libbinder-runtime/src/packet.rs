@@ -9,7 +9,7 @@ use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
 use libbinder_raw::types::reference::ObjectRef;
 
-use crate::{ArcRuntime, binder_object::{self, BinderObject, CreateInterfaceObject}, proxy::ProxyObject, reference::{OwnedRemoteRef, Reference}};
+use crate::{ArcRuntime, binder_object::{self, BinderObject, CreateInterfaceObject}, proxy::Object, reference::{OwnedRemoteRef, Reference}};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
@@ -244,7 +244,7 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Re
     
     let concrete = match reference {
       Either::Left(remote) => {
-        T::try_from_remote(self.runtime, ProxyObject { runtime: self.runtime.clone(), remote_ref: remote.clone() })
+        T::try_from_remote(self.runtime, Object { runtime: self.runtime.clone(), reference: Either::Left(remote.clone()) })
           .map(Arc::new)
           .map_err(|_| ())?
       },

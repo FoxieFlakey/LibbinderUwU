@@ -1,4 +1,4 @@
-use libbinder_runtime::{ArcRuntime, binder_object::{BinderObject, CreateInterfaceObject}, formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::Packet, proxy::ProxyObject};
+use libbinder_runtime::{ArcRuntime, binder_object::{BinderObject, CreateInterfaceObject}, formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::Packet, proxy::Object};
 
 pub trait IAnService: Send + Sync {
   fn length_of_string(&self, string: &str) -> usize;
@@ -15,7 +15,7 @@ pub const ISERVICE_MANAGER_CODE_BWAH_UWU: u32 = 0x02;
 // on diff process
 pub struct AnServiceProxy {
   runtime: ArcRuntime<AnServiceProxy>,
-  proxy: ProxyObject<AnServiceProxy>
+  proxy: Object<AnServiceProxy>
 }
 
 impl AnServiceProxy {
@@ -62,7 +62,7 @@ impl IAnService for AnServiceProxy {
 }
 
 impl CreateInterfaceObject<Self> for AnServiceProxy {
-  fn try_from_remote(runtime: &ArcRuntime<Self>, remote_ref: ProxyObject<Self>) -> Result<Self, ()> {
+  fn try_from_remote(runtime: &ArcRuntime<Self>, remote_ref: Object<Self>) -> Result<Self, ()> {
     Ok(Self {
       runtime: runtime.clone(),
       proxy: remote_ref

@@ -8,11 +8,12 @@
 use std::{collections::HashSet, io, marker::PhantomData, mem, ops::Deref, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, Mutex, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
 
 use by_address::ByAddress;
+use either::Either;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::PacketSendError, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::{binder_set_context_mgr, object::reference::ObjectRefRemote, types::reference::ObjectRef};
 use nix::{errno::Errno, fcntl::{OFlag, open}, poll::{PollFd, PollFlags, PollTimeout, poll}, sys::stat::Mode};
 
-use crate::{binder_object::{BinderObject, CreateInterfaceObject}, packet::{Packet, PacketBuilder}, proxy::ProxyObject, reference::{OwnedRemoteRef, Reference}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
+use crate::{binder_object::{BinderObject, CreateInterfaceObject}, packet::{Packet, PacketBuilder}, proxy::Object, reference::{OwnedRemoteRef, Reference}, util::mmap::{MemorySpan, MmapError, MmapRegion, Protection}};
 
 pub mod binder_object;
 pub mod packet;
@@ -114,7 +115,7 @@ pub enum RuntimeCreateAsClientError {
 impl<ContextManager: BinderObject<ContextManager> + CreateInterfaceObject<ContextManager>> ArcRuntime<ContextManager> {
   pub fn new() -> Result<Self, RuntimeCreateAsClientError> {
     let rt= Self::new_impl().map_err(RuntimeCreateAsClientError::CommonCreateError)?;
-    let concrete_manager = ContextManager::try_from_remote(&rt, ProxyObject { runtime: rt.clone(), remote_ref: Arc::new(OwnedRemoteRef { obj_ref: ObjectRefRemote { data_handle: 0 }}) })
+    let concrete_manager = ContextManager::try_from_remote(&rt, Object { runtime: rt.clone(), reference: Either::Left(Arc::new(OwnedRemoteRef { obj_ref: ObjectRefRemote { data_handle: 0 }})) })
       .map(Arc::new)
       .map_err(|_| RuntimeCreateAsClientError::WrongContextManagerType)?;
     *rt.shared.ctx_manager.write().unwrap() = Some(concrete_manager.clone());

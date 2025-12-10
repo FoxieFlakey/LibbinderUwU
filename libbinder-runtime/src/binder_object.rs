@@ -2,7 +2,7 @@ use std::{any::Any, mem, ptr::{self, DynMetadata}, sync::Arc};
 
 use libbinder_raw::object::reference::ObjectRefLocal;
 
-use crate::{ArcRuntime, packet::Packet, proxy::ProxyObject};
+use crate::{ArcRuntime, packet::Packet, proxy::Object};
 
 // Any trait is used to convert bare Arc<dyn BinderObjec> to local implementation
 // usually used for when receiving local reference
@@ -11,7 +11,7 @@ pub trait BinderObject<ContextManager: BinderObject<ContextManager>>: Sync + Sen
 }
 
 pub trait CreateInterfaceObject<ContextManager: BinderObject<ContextManager>>: Sized {
-  fn try_from_remote(runtime: &ArcRuntime<ContextManager>, remote_ref: ProxyObject<ContextManager>) -> Result<Self, ()>;
+  fn try_from_remote(runtime: &ArcRuntime<ContextManager>, remote_ref: Object<ContextManager>) -> Result<Self, ()>;
 }
 
 // This does not increments the strong count
