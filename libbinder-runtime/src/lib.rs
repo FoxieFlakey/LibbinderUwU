@@ -158,8 +158,8 @@ impl<ContextManager: BinderObject<ContextManager>> ArcRuntime<ContextManager> {
 }
 
 impl<ContextManager: BinderObject<ContextManager>> ArcRuntime<ContextManager> {
-  pub fn get_context_manager<'a>(&'a self) -> Reference<'a, ContextManager, ContextManager> {
-    Reference::context_manager(self)
+  pub fn get_context_manager(&self) -> Reference<ContextManager, ContextManager> {
+    Reference::context_manager(self.clone())
   }
   
   pub fn get_context_manager_object(&self) -> &Arc<dyn BinderObject<ContextManager>> {

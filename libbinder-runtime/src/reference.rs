@@ -1,8 +1,8 @@
-use std::{marker::{PhantomData, Unsize}, ops::Deref, sync::{Arc, LazyLock}};
+use std::{marker::Unsize, ops::Deref, sync::{Arc, LazyLock}};
 
 use libbinder_raw::types::reference::{ObjectRef, ObjectRefRemote};
 
-use crate::{Runtime, binder_object::{self, BinderObject}};
+use crate::{ArcRuntime, binder_object::{self, BinderObject}};
 
 // This calls BC_RELEASE when dropped
 pub struct OwnedRemoteRef {
@@ -17,37 +17,37 @@ impl Drop for OwnedRemoteRef {
   }
 }
 
-pub struct Reference<'runtime, ContextManager: BinderObject<ContextManager>, T: ?Sized> {
+pub struct Reference<ContextManager: BinderObject<ContextManager>, T: ?Sized> {
   // Concrete callable object
   // which doesn't have to be implementing BinderObject
   pub(crate) concrete: Arc<T>,
   pub(crate) remote_reference: Option<Arc<OwnedRemoteRef>>,
-  pub(crate) phantom: PhantomData<&'runtime Runtime<ContextManager>>
+  pub(crate) runtime: ArcRuntime<ContextManager>
 }
 
-impl<'runtime, ContextManager: BinderObject<ContextManager>, T: BinderObject<ContextManager> + ?Sized> Clone for Reference<'runtime, ContextManager, T> {
+impl<ContextManager: BinderObject<ContextManager>, T: BinderObject<ContextManager> + ?Sized> Clone for Reference<ContextManager, T> {
   fn clone(&self) -> Self {
     Self {
       concrete: self.concrete.clone(),
       remote_reference: self.remote_reference.clone(),
-      phantom: PhantomData {}
+      runtime: self.runtime.clone()
     }
   }
 }
 
 static CTX_MGR_REFERENCE: LazyLock<Arc<OwnedRemoteRef>> = LazyLock::new(|| Arc::new(OwnedRemoteRef { obj_ref: ObjectRefRemote { data_handle: 0 } }));
 
-impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime, ContextManager, ContextManager> {
-  pub(crate) fn context_manager(runtime: &'runtime Runtime<ContextManager>) -> Self {
+impl<ContextManager: BinderObject<ContextManager>> Reference<ContextManager, ContextManager> {
+  pub(crate) fn context_manager(runtime: ArcRuntime<ContextManager>) -> Self {
     Self {
       concrete: runtime.shared.ctx_manager.read().unwrap().clone().unwrap(),
       remote_reference: Some(CTX_MGR_REFERENCE.clone()),
-      phantom: PhantomData {}
+      runtime: runtime.clone()
     }
   }
 }
 
-impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>> {
+impl<ContextManager: BinderObject<ContextManager>> Reference<ContextManager, dyn BinderObject<ContextManager>> {
   pub(crate) fn get_concrete(&self) -> &Arc<dyn BinderObject<ContextManager>> {
     &self.concrete
   }
@@ -65,19 +65,19 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime,
   }
 }
 
-impl<'runtime, ContextManager: BinderObject<ContextManager>, T> Reference<'runtime, ContextManager, T> {
-  pub fn coerce<U: ?Sized>(self) -> Reference<'runtime, ContextManager, U>
+impl<ContextManager: BinderObject<ContextManager>, T> Reference<ContextManager, T> {
+  pub fn coerce<U: ?Sized>(self) -> Reference<ContextManager, U>
     where T: Unsize<U>
   {
     Reference {
       concrete: self.concrete as Arc<U>,
-      remote_reference: self.remote_reference.clone(),
-      phantom: PhantomData
+      remote_reference: self.remote_reference,
+      runtime: self.runtime
     }
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager>, T: ?Sized> Deref for Reference<'_, ContextManager, T> {
+impl<ContextManager: BinderObject<ContextManager>, T: ?Sized> Deref for Reference<ContextManager, T> {
   type Target = T;
   
   fn deref(&self) -> &Self::Target {

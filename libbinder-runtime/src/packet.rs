@@ -2,7 +2,7 @@
 // but with extended methods, to ensure
 // safety of object references stored in it
 
-use std::{cell::RefCell, ffi::CStr, marker::PhantomData, ops::Deref, os::fd::AsRawFd, rc::Rc, sync::Arc};
+use std::{cell::RefCell, ffi::CStr, ops::Deref, os::fd::AsRawFd, rc::Rc, sync::Arc};
 
 use either::Either;
 use enumflags2::BitFlags;
@@ -181,7 +181,7 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Wr
   impl_forward!(write_bool, write_bool_array, write_bool_slice, bool);
   
   // Additional extension for writer here
-  pub fn write_obj_ref<T: BinderObject<ContextManager>>(&mut self, reference: Reference<'runtime, ContextManager, T>) {
+  pub fn write_obj_ref<T: BinderObject<ContextManager>>(&mut self, reference: Reference<ContextManager, T>) {
     let reference = reference.coerce::<dyn BinderObject<ContextManager>>();
     let offset = self.inner.get_current_offset();
     match reference.get_remote() {
@@ -237,7 +237,7 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Re
   forward!(read_f64_slice, SliceReadResult<'packet, f64>);
   
   // Additional extension for reader here
-  pub fn read_obj_ref<T: BinderObject<ContextManager> + CreateInterfaceObject<ContextManager>>(&mut self) -> Result<Reference<'runtime, ContextManager, T>, ()> {
+  pub fn read_obj_ref<T: BinderObject<ContextManager> + CreateInterfaceObject<ContextManager>>(&mut self) -> Result<Reference<ContextManager, T>, ()> {
     let reference = self.packet.refs.binary_search_by_key(&self.inner.get_current_offset(), |x| x.0)
       .map(|x| &self.packet.refs[x].1)
       .map_err(|_| ())?;
@@ -254,7 +254,7 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Re
       }
     };
     
-    Ok(Reference { concrete: concrete, remote_reference: reference.clone().left(), phantom: PhantomData {} })
+    Ok(Reference { concrete: concrete, remote_reference: reference.clone().left(), runtime: self.runtime.clone() })
   }
 }
 
