@@ -75,7 +75,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
     
     TransactionDataRaw {
       data_size: self.data.data_slice.len(),
-      offsets_size: self.data.offsets.len(),
+      offsets_size: self.data.offsets.len() * size_of::<usize>(),
       sender_pid: 0,
       sender_uid: 0,
       flags: self.data.flags.bits(),
