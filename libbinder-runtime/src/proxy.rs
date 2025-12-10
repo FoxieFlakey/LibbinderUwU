@@ -4,19 +4,18 @@
 use std::sync::Arc;
 
 use libbinder::packet::PacketSendError;
-use libbinder_raw::types::reference::ObjectRefRemote;
 
-use crate::{Runtime, binder_object::{BinderObject, CreateInterfaceObject}, packet::Packet};
+use crate::{Runtime, binder_object::{BinderObject, CreateInterfaceObject}, packet::Packet, reference::OwnedRemoteRef};
 
 pub struct ProxyObject<ContextManager: BinderObject<ContextManager>> {
   pub(crate) runtime: Arc<Runtime<ContextManager>>,
-  pub(crate) remote_ref: ObjectRefRemote
+  pub(crate) remote_ref: Arc<OwnedRemoteRef>
 }
 
 impl<ContextManager: BinderObject<ContextManager>> BinderObject<ContextManager> for ProxyObject<ContextManager> {
   fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<ContextManager>>, packet: &Packet<'runtime, ContextManager>) -> crate::packet::Packet<'runtime, ContextManager> {
     assert!(Arc::ptr_eq(&self.runtime, runtime), "Attempting to use this binder object on other runtime!");
-    match runtime.send_packet(self.remote_ref.clone(), packet) {
+    match runtime.send_packet(self.remote_ref.obj_ref.clone(), packet) {
       Ok(reply) => reply,
       Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
       Err(e) => panic!("Error occur while proxying to remote object: {e:#?}")

@@ -5,8 +5,8 @@ use libbinder_raw::types::reference::{ObjectRef, ObjectRefRemote};
 use crate::{Runtime, binder_object::{self, BinderObject}};
 
 // This calls BC_RELEASE when dropped
-struct OwnedRemoteRef {
-  obj_ref: ObjectRefRemote
+pub struct OwnedRemoteRef {
+  pub obj_ref: ObjectRefRemote
 }
 
 impl Drop for OwnedRemoteRef {
