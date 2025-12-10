@@ -48,6 +48,14 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime,
 }
 
 impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>> {
+  pub(crate) fn get_concrete(&self) -> &Arc<dyn BinderObject<ContextManager>> {
+    &self.concrete
+  }
+  
+  pub(crate) fn get_remote(&self) -> Option<&Arc<OwnedRemoteRef>> {
+    self.remote_reference.as_ref()
+  }
+  
   pub(crate) fn as_raw_object_ref(&self) -> ObjectRef {
     if let Some(remote) = &self.remote_reference {
       ObjectRef::Remote(remote.obj_ref.clone())

@@ -2,18 +2,24 @@
 // but with extended methods, to ensure
 // safety of object references stored in it
 
-use std::{ffi::CStr, mem, ops::Deref, os::fd::AsRawFd};
+use std::{cell::RefCell, ffi::CStr, ops::Deref, os::fd::AsRawFd, rc::Rc, sync::Arc};
 
 use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
 
-use crate::{Runtime, binder_object::BinderObject, reference::Reference};
+use crate::{Runtime, binder_object::BinderObject, reference::{OwnedRemoteRef, Reference}};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
 pub struct Packet<'runtime, ContextManager: BinderObject<ContextManager>> {
   runtime: &'runtime Runtime<ContextManager>,
-  taken_refs: Vec<Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>>>,
+  // Don't know the concrete type of this, there might be multiple
+  // proxy objects sharing same remote reference, so the proxy SHOULD
+  // not store any local data
+  remote_refs: Vec<Arc<OwnedRemoteRef>>,
+  
+  // There always one instance of given object, shared via Arc on it
+  local_refs: Vec<Arc<dyn BinderObject<ContextManager>>>,
   inner: PacketUnderlying<'runtime>
 }
 
@@ -27,13 +33,15 @@ pub struct PacketReader<'runtime, 'packet, ContextManager: BinderObject<ContextM
 // belong to the same runtime
 pub struct PacketBuilder<'runtime, ContextManager: BinderObject<ContextManager>> {
   runtime: &'runtime Runtime<ContextManager>,
-  taken_refs: Vec<Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>>>,
+  local_refs: Rc<RefCell<Vec<Arc<dyn BinderObject<ContextManager>>>>>,
+  remote_refs: Rc<RefCell<Vec<Arc<OwnedRemoteRef>>>>,
   inner: PacketBuilderUnderlying<'runtime>
 }
 
 pub struct PacketWriter<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: WriteFormat<'packet>> {
   inner: Writer<'packet, 'runtime, Format>,
-  taken_refs: Vec<Reference<'runtime, ContextManager, dyn BinderObject<ContextManager>>>,
+  local_refs: Rc<RefCell<Vec<Arc<dyn BinderObject<ContextManager>>>>>,
+  remote_refs: Rc<RefCell<Vec<Arc<OwnedRemoteRef>>>>,
   #[expect(unused)]
   runtime: &'runtime Runtime<ContextManager>
 }
@@ -41,12 +49,15 @@ pub struct PacketWriter<'runtime, 'packet, ContextManager: BinderObject<ContextM
 impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, ContextManager> {
   pub(crate) fn new(runtime: &'runtime Runtime<ContextManager>, packet: PacketUnderlying<'runtime> ) -> Self {
     assert!(runtime.shared.binder_dev.as_raw_fd() == packet.get_binder_dev().as_raw_fd(), "attempting to construct packet using packet belonging to different runtime");
-    let taken_refs = Vec::new();
+    let local_refs = Vec::new();
+    let remote_refs = Vec::new();
     // TODO: Handle reader side to store any references into 'taken_refs'
+    
     
     Self {
       runtime,
-      taken_refs: taken_refs,
+      local_refs,
+      remote_refs,
       inner: packet
     }
   }
@@ -63,7 +74,8 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Into<PacketBuilder<
   fn into(self) -> PacketBuilder<'runtime, ContextManager> {
     PacketBuilder {
       runtime: self.runtime,
-      taken_refs: self.taken_refs,
+      local_refs: Rc::new(RefCell::new(self.local_refs)),
+      remote_refs: Rc::new(RefCell::new(self.remote_refs)),
       inner: self.inner.into()
     }
   }
@@ -81,7 +93,8 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> PacketBuilder<'runt
   pub(crate) fn new(runtime: &'runtime Runtime<ContextManager>) -> Self {
     Self {
       runtime,
-      taken_refs: Vec::new(),
+      local_refs: Rc::new(RefCell::new(Vec::new())),
+      remote_refs: Rc::new(RefCell::new(Vec::new())),
       inner: PacketBuilderUnderlying::new(runtime.get_binder())
     }
   }
@@ -89,7 +102,8 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> PacketBuilder<'runt
   pub fn writer<'packet, Format: WriteFormat<'packet>>(&'packet mut self, format: Format) -> PacketWriter<'runtime, 'packet, ContextManager, Format> {
     PacketWriter {
       inner: self.inner.writer(format),
-      taken_refs: Vec::new(),
+      local_refs: self.local_refs.clone(),
+      remote_refs: self.remote_refs.clone(),
       runtime: self.runtime
     }
   }
@@ -107,11 +121,14 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> PacketBuilder<'runt
   
   pub fn clear(&mut self) {
     self.inner.clear();
+    self.local_refs.borrow_mut().clear();
+    self.remote_refs.borrow_mut().clear();
   }
   
   pub fn build(&mut self) -> Packet<'runtime, ContextManager> {
     let mut ret = Packet::new(self.runtime, self.inner.build());
-    ret.taken_refs = mem::replace(&mut self.taken_refs, Vec::new());
+    ret.local_refs = self.local_refs.replace(Vec::new());
+    ret.remote_refs = self.remote_refs.replace(Vec::new());
     self.clear();
     ret
   }
@@ -160,11 +177,13 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Wr
   // Additional extension for writer here
   pub fn write_obj_ref<T: BinderObject<ContextManager>>(&mut self, reference: Reference<'runtime, ContextManager, T>) {
     let reference = reference as Reference<'_, ContextManager, dyn BinderObject<ContextManager>>;
-    let raw_ref = reference.as_raw_object_ref();
-    self.taken_refs.push(reference);
+    match reference.get_remote() {
+      Some(remote) => self.remote_refs.borrow_mut().push(remote.clone()),
+      None => self.local_refs.borrow_mut().push(reference.get_concrete().clone())
+    }
     
     // Kept the references alive, and the underlying packet builder does not leak
-    unsafe { self.inner.write_obj_ref(raw_ref) };
+    unsafe { self.inner.write_obj_ref(reference.as_raw_object_ref()) };
   }
 }
 
