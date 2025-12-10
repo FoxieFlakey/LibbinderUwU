@@ -31,7 +31,7 @@ impl AnServiceProxy {
 
 impl IAnService for AnServiceProxy {
   fn bwah_uwu(&self, data: &str) {
-    let mut builder = self.runtime.new_packet_builder();
+    let mut builder = Runtime::new_packet_builder(&self.runtime);
     builder.writer(DeadSimpleFormat::new())
       .write_str(data);
     builder.set_code(ISERVICE_MANAGER_CODE_BWAH_UWU);
@@ -45,7 +45,7 @@ impl IAnService for AnServiceProxy {
   }
   
   fn length_of_string(&self, string: &str) -> usize {
-    let mut builder = self.runtime.new_packet_builder();
+    let mut builder = Runtime::new_packet_builder(&self.runtime);
     builder.writer(DeadSimpleFormat::new())
       .write_str(string);
     builder.set_code(ISERVICE_MANAGER_CODE_LENGTH_OF_STRING);

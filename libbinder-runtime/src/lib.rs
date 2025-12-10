@@ -200,8 +200,8 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     self.shared.binder_dev.as_fd()
   }
   
-  pub(crate) fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a, ContextManager>) -> Result<Packet<'a, ContextManager>, PacketSendError> {
-    assert!(self.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
+  pub(crate) fn send_packet<'a>(runtime: &'a Arc<Self>, target: ObjectRefRemote, packet: &Packet<'a, ContextManager>) -> Result<Packet<'a, ContextManager>, PacketSendError> {
+    assert!(runtime.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
     
     // Make sure know all the local objects that was sent outside
     packet.iter_references()
@@ -215,7 +215,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
       .for_each(|reference| {
         let arc_ref: Arc<dyn BinderObject<ContextManager>> = unsafe { binder_object::from_local_object_ref(&reference) };
         
-        let was_succesfully_inserted = self.shared.local_objects.lock()
+        let was_succesfully_inserted = runtime.shared.local_objects.lock()
           .unwrap()
           .insert(ByAddress(arc_ref.clone()));
         
@@ -226,11 +226,11 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
       });
     
     packet.send(target)
-      .map(|packet| Packet::new(self, packet))
+      .map(|packet| Packet::new(runtime, packet))
   }
   
-  pub fn new_packet_builder<'a>(&'a self) -> PacketBuilder<'a, ContextManager> {
-    PacketBuilder::new(self)
+  pub fn new_packet_builder<'a>(runtime: &'a Arc<Self>) -> PacketBuilder<'a, ContextManager> {
+    PacketBuilder::new(runtime)
   }
 }
 

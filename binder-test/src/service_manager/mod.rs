@@ -37,7 +37,7 @@ pub fn main() {
 // to the actual implementation
 impl BinderObject<Self> for AnServiceImpl {
   fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<Self>>, packet: &Packet<'runtime, Self>) -> Packet<'runtime, Self> {
-    let mut reply_builder = runtime.new_packet_builder();
+    let mut reply_builder = Runtime::new_packet_builder(runtime);
     reply_builder.set_code(ISERVICE_MANAGER_RET_OK);
     match packet.get_code() {
       ISERVICE_MANAGER_CODE_LENGTH_OF_STRING => {

@@ -15,7 +15,7 @@ pub struct ProxyObject<ContextManager: BinderObject<ContextManager>> {
 impl<ContextManager: BinderObject<ContextManager>> BinderObject<ContextManager> for ProxyObject<ContextManager> {
   fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<ContextManager>>, packet: &Packet<'runtime, ContextManager>) -> crate::packet::Packet<'runtime, ContextManager> {
     assert!(Arc::ptr_eq(&self.runtime, runtime), "Attempting to use this binder object on other runtime!");
-    match runtime.send_packet(self.remote_ref.obj_ref.clone(), packet) {
+    match Runtime::send_packet(runtime, self.remote_ref.obj_ref.clone(), packet) {
       Ok(reply) => reply,
       Err(PacketSendError::DeadTarget) => panic!("Target was dead cannot proxyy over"),
       Err(e) => panic!("Error occur while proxying to remote object: {e:#?}")
