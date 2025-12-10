@@ -113,7 +113,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
     // SAFETY: The buffers data as far as 'static concerned lives longer
     // before the 'static reference gone
     let data_slice: &'static [u8] = unsafe { slice::from_raw_parts(raw.data.ptr.buffer as *mut _, raw.data_size) };
-    let offsets: &'static [usize] = unsafe { slice::from_raw_parts(raw.data.ptr.offsets as *mut _, raw.offsets_size) };
+    let offsets: &'static [usize] = unsafe { slice::from_raw_parts(raw.data.ptr.offsets as *mut _, raw.offsets_size / size_of::<usize>()) };
     
     Self {
       _kernel_buf: Arc::new(KernelBuffer {

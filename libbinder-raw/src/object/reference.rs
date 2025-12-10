@@ -48,7 +48,7 @@ impl ObjectRef {
   }
   
   pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
-    let obj_type = object::Type::from_bytes(bytes);
+    let obj_type = object::Type::from_bytes(&bytes[..Type::bytes_needed()]);
     let raw = PodData::<ObjectRefRaw>::from_bytes(bytes);
     match obj_type {
       object::Type::LocalReference => Ok(ObjectRef::Local(ObjectRefLocal {

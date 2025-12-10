@@ -31,6 +31,7 @@ impl InnerWriter<'_> for WriterState {
 impl<'packet, Format: WriteFormat<'packet>> Drop for Writer<'packet, '_, Format> {
   fn drop(&mut self) {
     mem::swap(self.format.get_writer().get_data_buffer_mut(), &mut self.result.data_buffer);
+    mem::swap(&mut self.result.offsets_buffer, &mut self.offsets);
   }
 }
 

@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use bytemuck_utils::PodData;
 
-use crate::types::reference::{ObjectRefLocal, ObjectRefRemote};
+use crate::types::reference::ObjectRefRaw;
 
 const TYPE_LARGE: u8 = 0x85;
 
@@ -45,8 +45,8 @@ impl Type {
   // Tells how many bytes needed for given type
   pub fn type_size_with_header(&self) -> usize {
     match self {
-      Type::LocalReference => size_of::<ObjectRefLocal>(),
-      Type::RemoteReference => size_of::<ObjectRefRemote>(),
+      Type::LocalReference => size_of::<ObjectRefRaw>(),
+      Type::RemoteReference => size_of::<ObjectRefRaw>(),
       
       _ => todo!()
     }

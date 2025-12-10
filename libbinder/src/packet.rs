@@ -192,13 +192,13 @@ impl<'binder> Packet<'binder> {
   }
   
   pub fn iter_references(&self) -> impl Iterator<Item = (usize, ObjectRef)> {
-    self.offset_buffer
+    self.transaction.get_common().offsets
       .iter()
       .map(|&x| {
-        (x, Type::from_bytes(&self.data_buffer[x..Type::bytes_needed()]))
+        (x, Type::from_bytes(&self.transaction.get_common().data_slice[x..x+Type::bytes_needed()]))
       })
       .map(|(offset, obj_ty)| {
-        let bytes = &self.data_buffer[offset..obj_ty.type_size_with_header()];
+        let bytes = &self.transaction.get_common().data_slice[offset..offset+obj_ty.type_size_with_header()];
         match obj_ty {
           Type::LocalReference | Type::RemoteReference => {
             (offset, ObjectRef::try_from_bytes(bytes).unwrap())
