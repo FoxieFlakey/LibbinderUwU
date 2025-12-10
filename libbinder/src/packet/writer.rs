@@ -47,6 +47,10 @@ impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Fo
       format
     }
   }
+  
+  pub fn get_current_offset(&mut self) -> usize {
+    self.format.get_writer().get_current_offset()
+  }
 }
 
 macro_rules! impl_forward {
