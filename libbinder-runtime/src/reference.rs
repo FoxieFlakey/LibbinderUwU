@@ -1,4 +1,4 @@
-use std::{marker::{PhantomData, Unsize}, ops::{CoerceUnsized, Deref}, sync::{Arc, LazyLock}};
+use std::{marker::{PhantomData, Unsize}, ops::Deref, sync::{Arc, LazyLock}};
 
 use libbinder_raw::types::reference::{ObjectRef, ObjectRefRemote};
 
@@ -65,6 +65,18 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Reference<'runtime,
   }
 }
 
+impl<'runtime, ContextManager: BinderObject<ContextManager>, T> Reference<'runtime, ContextManager, T> {
+  pub fn coerce<U: ?Sized>(self) -> Reference<'runtime, ContextManager, U>
+    where T: Unsize<U>
+  {
+    Reference {
+      concrete: self.concrete as Arc<U>,
+      remote_reference: self.remote_reference.clone(),
+      phantom: PhantomData
+    }
+  }
+}
+
 impl<ContextManager: BinderObject<ContextManager>, T: ?Sized> Deref for Reference<'_, ContextManager, T> {
   type Target = T;
   
@@ -73,7 +85,6 @@ impl<ContextManager: BinderObject<ContextManager>, T: ?Sized> Deref for Referenc
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager>, T: ?Sized + Unsize<U> + BinderObject<ContextManager>, U: ?Sized> CoerceUnsized<Reference<'_, ContextManager, U>> for Reference<'_, ContextManager, T> {}
 
 
 

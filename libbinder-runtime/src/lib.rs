@@ -1,6 +1,5 @@
 #![feature(ptr_metadata)]
 #![feature(unsize)]
-#![feature(coerce_unsized)]
 
 // A runtime, for ease of using libbinder
 // handles details of thread lifecycle and
@@ -25,7 +24,7 @@ pub use libbinder_raw::Version;
 pub use libbinder_raw::binder_version;
 mod util;
 
-struct Shared<ContextManager: BinderObject<ContextManager>> {
+struct Shared<ContextManager: BinderObject<ContextManager> + Sized> {
   binder_dev: OwnedFd,
   shutdown_pipe_wr: OwnedFd,
   shutdown_pipe_rd: OwnedFd,

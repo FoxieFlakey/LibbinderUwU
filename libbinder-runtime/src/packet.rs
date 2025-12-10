@@ -182,7 +182,7 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Wr
   
   // Additional extension for writer here
   pub fn write_obj_ref<T: BinderObject<ContextManager>>(&mut self, reference: Reference<'runtime, ContextManager, T>) {
-    let reference = reference as Reference<'_, ContextManager, dyn BinderObject<ContextManager>>;
+    let reference = reference.coerce::<dyn BinderObject<ContextManager>>();
     let offset = self.inner.get_current_offset();
     match reference.get_remote() {
       Some(remote) => self.refs.borrow_mut().push((offset, Either::Left(remote.clone()))),
@@ -254,7 +254,7 @@ impl<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: Re
       }
     };
     
-    Ok(Reference { concrete, remote_reference: reference.clone().left(), phantom: PhantomData {} })
+    Ok(Reference { concrete: concrete, remote_reference: reference.clone().left(), phantom: PhantomData {} })
   }
 }
 
