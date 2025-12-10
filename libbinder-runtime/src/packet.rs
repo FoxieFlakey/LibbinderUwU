@@ -55,7 +55,7 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, Co
     
     // Find the local references and remote one
     // so can properly track it
-    for reference in packet.iter_references() {
+    for (offset, reference) in packet.iter_references() {
       match reference {
         ObjectRef::Local(x) => {
           local_refs.push(unsafe { binder_object::from_local_object_ref(&x) });

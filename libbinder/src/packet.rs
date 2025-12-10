@@ -191,7 +191,7 @@ impl<'binder> Packet<'binder> {
     }
   }
   
-  pub fn iter_references(&self) -> impl Iterator<Item = ObjectRef> {
+  pub fn iter_references(&self) -> impl Iterator<Item = (usize, ObjectRef)> {
     self.offset_buffer
       .iter()
       .map(|&x| {
@@ -201,7 +201,7 @@ impl<'binder> Packet<'binder> {
         let bytes = &self.data_buffer[offset..obj_ty.type_size_with_header()];
         match obj_ty {
           Type::LocalReference | Type::RemoteReference => {
-            ObjectRef::try_from_bytes(bytes).unwrap()
+            (offset, ObjectRef::try_from_bytes(bytes).unwrap())
           }
           _ => panic!("unexpected")
         }

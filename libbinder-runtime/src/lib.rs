@@ -205,7 +205,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     
     // Make sure know all the local objects that was sent outside
     packet.iter_references()
-      .flat_map(|reference| match reference {
+      .flat_map(|(_, reference)| match reference {
         // Is out problem
         ObjectRef::Local(x) => Some(x.clone()),
         
