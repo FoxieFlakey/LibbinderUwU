@@ -6,8 +6,9 @@ use std::{cell::RefCell, ffi::CStr, ops::Deref, os::fd::AsRawFd, rc::Rc, sync::A
 
 use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
+use libbinder_raw::types::reference::ObjectRef;
 
-use crate::{Runtime, binder_object::BinderObject, reference::{OwnedRemoteRef, Reference}};
+use crate::{Runtime, binder_object::{self, BinderObject}, reference::{OwnedRemoteRef, Reference}};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
@@ -49,10 +50,22 @@ pub struct PacketWriter<'runtime, 'packet, ContextManager: BinderObject<ContextM
 impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, ContextManager> {
   pub(crate) fn new(runtime: &'runtime Runtime<ContextManager>, packet: PacketUnderlying<'runtime> ) -> Self {
     assert!(runtime.shared.binder_dev.as_raw_fd() == packet.get_binder_dev().as_raw_fd(), "attempting to construct packet using packet belonging to different runtime");
-    let local_refs = Vec::new();
-    let remote_refs = Vec::new();
-    // TODO: Handle reader side to store any references into 'taken_refs'
+    let mut local_refs = Vec::new();
+    let mut remote_refs = Vec::new();
     
+    // Find the local references and remote one
+    // so can properly track it
+    for reference in packet.iter_references() {
+      match reference {
+        ObjectRef::Local(x) => {
+          local_refs.push(unsafe { binder_object::from_local_object_ref(&x) });
+        }
+        
+        ObjectRef::Remote(x) => {
+          remote_refs.push(Arc::new(OwnedRemoteRef { obj_ref: x }));
+        }
+      }
+    }
     
     Self {
       runtime,
