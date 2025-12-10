@@ -99,6 +99,15 @@ impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Fo
   // binder device
   pub unsafe fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
     let offset = self.format.get_writer().get_current_offset();
+    if !offset.is_multiple_of(size_of::<u32>()) {
+      let bytes_to_align = offset.next_multiple_of(size_of::<u32>()) - offset;
+      for _ in 0..bytes_to_align {
+        self.write_u8(0);
+      }
+    }
+    let offset = self.format.get_writer().get_current_offset();
+    assert!(offset.is_multiple_of(size_of::<u32>()));
+    
     self.offsets.push(offset);
     obj_ref.with_raw_bytes(|bytes| {
       self.format.get_writer().write(bytes);

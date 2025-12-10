@@ -189,15 +189,21 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
   forward!(read_bool_slice, &'packet [bool]);
   
   pub fn read_reference(&mut self) -> Result<ObjectRef, ()> {
-    let ref_obj = Type::try_from_bytes(self.format.get_reader().peek(Type::bytes_needed(), 0)?)?;
+    let mut peek_offset = self.format.get_reader().get_current_offset();
+    if !peek_offset.is_multiple_of(size_of::<u32>()) {
+      peek_offset = peek_offset.next_multiple_of(size_of::<u32>());
+    }
+    let peek_offset = self.format.get_reader().get_current_offset() - peek_offset;
+    
+    let ref_obj = Type::try_from_bytes(self.format.get_reader().peek(Type::bytes_needed(), peek_offset)?)?;
     match ref_obj {
       Type::LocalReference | Type::RemoteReference => {
         let type_size = ref_obj.type_size_with_header();
-        let bytes = self.format.get_reader().peek(type_size, 0)?;
+        let bytes = self.format.get_reader().peek(type_size, peek_offset)?;
         let result = ObjectRef::try_from_bytes(bytes)?;
         
         // The data was successfully read, lets just advance the reader state
-        self.format.get_reader().read(type_size).unwrap();
+        self.format.get_reader().read(type_size + peek_offset).unwrap();
         Ok(result)
       }
       _ => Err(())
