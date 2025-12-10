@@ -9,12 +9,12 @@ use enumflags2::BitFlags;
 use libbinder::{formats::{ReadFormat, SliceReadResult, WriteFormat}, packet::{Packet as PacketUnderlying, builder::PacketBuilder as PacketBuilderUnderlying, reader::Reader, writer::Writer}};
 use libbinder_raw::types::reference::ObjectRef;
 
-use crate::{Runtime, binder_object::{self, BinderObject}, reference::{OwnedRemoteRef, Reference}};
+use crate::{ArcRuntime, binder_object::{self, BinderObject}, reference::{OwnedRemoteRef, Reference}};
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
 pub struct Packet<'runtime, ContextManager: BinderObject<ContextManager>> {
-  runtime: &'runtime Arc<Runtime<ContextManager>>,
+  runtime: &'runtime ArcRuntime<ContextManager>,
   // Don't know the concrete type of this, there might be multiple
   // proxy objects sharing same remote reference, so the proxy SHOULD
   // not store any local data
@@ -28,13 +28,13 @@ pub struct Packet<'runtime, ContextManager: BinderObject<ContextManager>> {
 pub struct PacketReader<'runtime, 'packet, ContextManager: BinderObject<ContextManager>, Format: ReadFormat<'packet>> {
   inner: Reader<'packet, 'runtime, Format>,
   #[expect(unused)]
-  runtime: &'runtime Arc<Runtime<ContextManager>>
+  runtime: &'runtime ArcRuntime<ContextManager>
 }
 
 // This struct has an invariant that all object reference in underlying packet
 // belong to the same runtime
 pub struct PacketBuilder<'runtime, ContextManager: BinderObject<ContextManager>> {
-  runtime: &'runtime Arc<Runtime<ContextManager>>,
+  runtime: &'runtime ArcRuntime<ContextManager>,
   refs: Rc<RefCell<Vec<(usize, Either<Arc<OwnedRemoteRef>, Arc<dyn BinderObject<ContextManager>>>)>>>,
   inner: PacketBuilderUnderlying<'runtime>
 }
@@ -43,11 +43,11 @@ pub struct PacketWriter<'runtime, 'packet, ContextManager: BinderObject<ContextM
   inner: Writer<'packet, 'runtime, Format>,
   refs: Rc<RefCell<Vec<(usize, Either<Arc<OwnedRemoteRef>, Arc<dyn BinderObject<ContextManager>>>)>>>,
   #[expect(unused)]
-  runtime: &'runtime Arc<Runtime<ContextManager>>
+  runtime: &'runtime ArcRuntime<ContextManager>
 }
 
 impl<'runtime, ContextManager: BinderObject<ContextManager>> Packet<'runtime, ContextManager> {
-  pub(crate) fn new(runtime: &'runtime Arc<Runtime<ContextManager>>, packet: PacketUnderlying<'runtime> ) -> Self {
+  pub(crate) fn new(runtime: &'runtime ArcRuntime<ContextManager>, packet: PacketUnderlying<'runtime> ) -> Self {
     assert!(runtime.shared.binder_dev.as_raw_fd() == packet.get_binder_dev().as_raw_fd(), "attempting to construct packet using packet belonging to different runtime");
     let mut refs = Vec::new();
     
@@ -99,7 +99,7 @@ impl<'runtime, ContextManager: BinderObject<ContextManager>> Deref for Packet<'r
 }
 
 impl<'runtime, ContextManager: BinderObject<ContextManager>> PacketBuilder<'runtime, ContextManager> {
-  pub(crate) fn new(runtime: &'runtime Arc<Runtime<ContextManager>>) -> Self {
+  pub(crate) fn new(runtime: &'runtime ArcRuntime<ContextManager>) -> Self {
     Self {
       runtime,
       refs: Rc::new(RefCell::new(Vec::new())),

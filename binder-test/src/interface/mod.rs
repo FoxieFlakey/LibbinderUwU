@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use libbinder_runtime::{Runtime, binder_object::{BinderObject, CreateInterfaceObject}, packet::Packet, proxy::ProxyObject, formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}};
+use libbinder_runtime::{ArcRuntime, binder_object::{BinderObject, CreateInterfaceObject}, formats::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}, packet::Packet, proxy::ProxyObject};
 
 pub trait IAnService: Send + Sync {
   fn length_of_string(&self, string: &str) -> usize;
@@ -16,7 +14,7 @@ pub const ISERVICE_MANAGER_CODE_BWAH_UWU: u32 = 0x02;
 // hardcode. This proxies thru Binder to actual implementation
 // on diff process
 pub struct AnServiceProxy {
-  runtime: Arc<Runtime<AnServiceProxy>>,
+  runtime: ArcRuntime<AnServiceProxy>,
   proxy: ProxyObject<AnServiceProxy>
 }
 
@@ -31,7 +29,7 @@ impl AnServiceProxy {
 
 impl IAnService for AnServiceProxy {
   fn bwah_uwu(&self, data: &str) {
-    let mut builder = Runtime::new_packet_builder(&self.runtime);
+    let mut builder = self.runtime.new_packet_builder();
     builder.writer(DeadSimpleFormat::new())
       .write_str(data);
     builder.set_code(ISERVICE_MANAGER_CODE_BWAH_UWU);
@@ -45,7 +43,7 @@ impl IAnService for AnServiceProxy {
   }
   
   fn length_of_string(&self, string: &str) -> usize {
-    let mut builder = Runtime::new_packet_builder(&self.runtime);
+    let mut builder = self.runtime.new_packet_builder();
     builder.writer(DeadSimpleFormat::new())
       .write_str(string);
     builder.set_code(ISERVICE_MANAGER_CODE_LENGTH_OF_STRING);
@@ -64,7 +62,7 @@ impl IAnService for AnServiceProxy {
 }
 
 impl CreateInterfaceObject<Self> for AnServiceProxy {
-  fn try_from_remote(runtime: &Arc<Runtime<Self>>, remote_ref: ProxyObject<Self>) -> Result<Self, ()> {
+  fn try_from_remote(runtime: &ArcRuntime<Self>, remote_ref: ProxyObject<Self>) -> Result<Self, ()> {
     Ok(Self {
       runtime: runtime.clone(),
       proxy: remote_ref
@@ -73,7 +71,7 @@ impl CreateInterfaceObject<Self> for AnServiceProxy {
 }
 
 impl BinderObject<Self> for AnServiceProxy {
-  fn on_packet<'runtime>(&self, runtime: &'runtime Arc<Runtime<Self>>, packet: &Packet<'runtime, Self>) -> Packet<'runtime, Self> {
+  fn on_packet<'runtime>(&self, runtime: &'runtime ArcRuntime<Self>, packet: &Packet<'runtime, Self>) -> Packet<'runtime, Self> {
     self.proxy.on_packet(runtime, packet)
   }
 }

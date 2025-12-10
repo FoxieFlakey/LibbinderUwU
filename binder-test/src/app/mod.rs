@@ -1,9 +1,9 @@
-use libbinder_runtime::{Runtime, reference::Reference};
+use libbinder_runtime::{ArcRuntime, reference::Reference};
 
 use crate::{common::log, interface::{IAnService, AnServiceProxy}};
 
 pub fn main() {
-  let runtime = Runtime::<AnServiceProxy>::new().ok().unwrap();
+  let runtime = ArcRuntime::<AnServiceProxy>::new().ok().unwrap();
   nix::unistd::sleep(1);
   
   // The client can act on IAnService interface

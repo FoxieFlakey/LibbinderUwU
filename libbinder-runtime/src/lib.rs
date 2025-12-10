@@ -6,7 +6,7 @@
 // handles details of thread lifecycle and
 // other stuffs
 
-use std::{collections::HashSet, io, marker::PhantomData, mem, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, Mutex, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
+use std::{collections::HashSet, io, marker::PhantomData, mem, ops::Deref, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, sync::{Arc, Mutex, OnceLock, RwLock, Weak}, thread::{self, JoinHandle}};
 
 use by_address::ByAddress;
 use libbinder::{command_buffer::{Command, CommandBuffer, ExecResult}, packet::PacketSendError, return_buffer::{ReturnBuffer, ReturnValue}};
@@ -61,6 +61,26 @@ pub struct Runtime<ContextManager: BinderObject<ContextManager>> {
   _phantom: PhantomData<&'static ContextManager>
 }
 
+pub struct ArcRuntime<ContextManager: BinderObject<ContextManager>> {
+  inner: Arc<Runtime<ContextManager>>
+}
+
+impl<ContextManager: BinderObject<ContextManager>> Clone for ArcRuntime<ContextManager> {
+  fn clone(&self) -> Self {
+    Self {
+      inner: self.inner.clone()
+    }
+  }
+}
+
+impl<ContextManager: BinderObject<ContextManager>> Deref for ArcRuntime<ContextManager> {
+  type Target = Runtime<ContextManager>;
+  
+  fn deref(&self) -> &Self::Target {
+    &self.inner
+  }
+}
+
 impl<ContextManager: BinderObject<ContextManager>> Drop for Runtime<ContextManager> {
   fn drop(&mut self) {
     if let Some(handle) = self.looper_thrd.take() {
@@ -92,8 +112,8 @@ pub enum RuntimeCreateAsClientError {
   WrongContextManagerType
 }
 
-impl<ContextManager: BinderObject<ContextManager> + CreateInterfaceObject<ContextManager>> Runtime<ContextManager> {
-  pub fn new() -> Result<Arc<Self>, RuntimeCreateAsClientError> {
+impl<ContextManager: BinderObject<ContextManager> + CreateInterfaceObject<ContextManager>> ArcRuntime<ContextManager> {
+  pub fn new() -> Result<Self, RuntimeCreateAsClientError> {
     let rt= Self::new_impl().map_err(RuntimeCreateAsClientError::CommonCreateError)?;
     let concrete_manager = ContextManager::try_from_remote(&rt, ProxyObject { runtime: rt.clone(), remote_ref: Arc::new(OwnedRemoteRef { obj_ref: ObjectRefRemote { data_handle: 0 }}) })
       .map(Arc::new)
@@ -102,7 +122,7 @@ impl<ContextManager: BinderObject<ContextManager> + CreateInterfaceObject<Contex
     rt.cached_ctx_manager.set(concrete_manager.clone()).ok().unwrap();
     rt.cached_ctx_manager_upcasted.set(concrete_manager).ok().unwrap();
     
-    let runtime_weak = Arc::downgrade(&rt);
+    let runtime_weak = Arc::downgrade(&rt.inner);
     rt.looper_thrd.set(thread::spawn(move || {
         run_looper(runtime_weak, false);
       }
@@ -111,8 +131,8 @@ impl<ContextManager: BinderObject<ContextManager> + CreateInterfaceObject<Contex
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
-  pub fn new_as_manager(ctx_manager: Arc<ContextManager>) -> Result<Arc<Self>, RuntimeCreateAsManagerError<ContextManager>> {
+impl<ContextManager: BinderObject<ContextManager>> ArcRuntime<ContextManager> {
+  pub fn new_as_manager(ctx_manager: Arc<ContextManager>) -> Result<Self, RuntimeCreateAsManagerError<ContextManager>> {
     let rt = Self::new_impl()
       .map_err(RuntimeCreateAsManagerError::CommonCreateError)?;
     
@@ -129,7 +149,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
     rt.cached_ctx_manager.set(ctx_manager.clone()).ok().unwrap();
     rt.cached_ctx_manager_upcasted.set(ctx_manager).ok().unwrap();
     
-    let runtime_weak = Arc::downgrade(&rt);
+    let runtime_weak = Arc::downgrade(&rt.inner);
     rt.looper_thrd.set(thread::spawn(move || {
         run_looper(runtime_weak, false);
       }
@@ -138,7 +158,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
+impl<ContextManager: BinderObject<ContextManager>> ArcRuntime<ContextManager> {
   pub fn get_context_manager<'a>(&'a self) -> Reference<'a, ContextManager, ContextManager> {
     Reference::context_manager(self)
   }
@@ -160,8 +180,8 @@ impl<ContextManager: BinderObject<ContextManager>> Drop for Shared<ContextManage
   }
 }
 
-impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
-  fn new_impl() -> Result<Arc<Self>, RuntimeCreateError> {
+impl<ContextManager: BinderObject<ContextManager>> ArcRuntime<ContextManager> {
+  fn new_impl() -> Result<Self, RuntimeCreateError> {
     let (rd, wr) = nix::unistd::pipe()
       .map_err(io::Error::from)
       .map_err(RuntimeCreateError::ErrorCreatingPipe)?;
@@ -187,21 +207,23 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
       binder_dev
     });
     
-    Ok(Arc::new(Self {
-      looper_thrd: OnceLock::new(),
-      cached_ctx_manager: OnceLock::new(),
-      cached_ctx_manager_upcasted: OnceLock::new(),
-      _phantom: PhantomData {},
-      shared
-    }))
+    Ok(Self {
+      inner: Arc::new(Runtime {
+        looper_thrd: OnceLock::new(),
+        cached_ctx_manager: OnceLock::new(),
+        cached_ctx_manager_upcasted: OnceLock::new(),
+        _phantom: PhantomData {},
+        shared
+      })
+    })
   }
   
   pub(crate) fn get_binder<'a>(&'a self) -> BorrowedFd<'a> {
     self.shared.binder_dev.as_fd()
   }
   
-  pub(crate) fn send_packet<'a>(runtime: &'a Arc<Self>, target: ObjectRefRemote, packet: &Packet<'a, ContextManager>) -> Result<Packet<'a, ContextManager>, PacketSendError> {
-    assert!(runtime.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
+  pub(crate) fn send_packet<'a>(&'a self, target: ObjectRefRemote, packet: &Packet<'a, ContextManager>) -> Result<Packet<'a, ContextManager>, PacketSendError> {
+    assert!(self.shared.binder_dev.as_fd().as_raw_fd() == packet.get_binder_dev().as_raw_fd());
     
     // Make sure know all the local objects that was sent outside
     packet.iter_references()
@@ -215,7 +237,7 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
       .for_each(|reference| {
         let arc_ref: Arc<dyn BinderObject<ContextManager>> = unsafe { binder_object::from_local_object_ref(&reference) };
         
-        let was_succesfully_inserted = runtime.shared.local_objects.lock()
+        let was_succesfully_inserted = self.shared.local_objects.lock()
           .unwrap()
           .insert(ByAddress(arc_ref.clone()));
         
@@ -226,11 +248,11 @@ impl<ContextManager: BinderObject<ContextManager>> Runtime<ContextManager> {
       });
     
     packet.send(target)
-      .map(|packet| Packet::new(runtime, packet))
+      .map(|packet| Packet::new(self, packet))
   }
   
-  pub fn new_packet_builder<'a>(runtime: &'a Arc<Self>) -> PacketBuilder<'a, ContextManager> {
-    PacketBuilder::new(runtime)
+  pub fn new_packet_builder<'a>(&'a self) -> PacketBuilder<'a, ContextManager> {
+    PacketBuilder::new(self)
   }
 }
 
@@ -293,6 +315,7 @@ fn run_looper<ContextManager: BinderObject<ContextManager>>(runtime: Weak<Runtim
           // Runtime is dead, quit
           break 'poll_loop;
         };
+      let runtime = ArcRuntime { inner: runtime };
       
       for v in ret_buf.get_parsed().iter() {
         match v {
