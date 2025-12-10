@@ -217,6 +217,10 @@ impl<ContextManager: BinderObject<ContextManager>> ArcRuntime<ContextManager> {
     })
   }
   
+  pub fn ptr_eq(lhs: &ArcRuntime<ContextManager>, rhs: &ArcRuntime<ContextManager>) -> bool {
+    Arc::ptr_eq(&lhs.inner, &rhs.inner)
+  }
+  
   pub(crate) fn get_binder<'a>(&'a self) -> BorrowedFd<'a> {
     self.shared.binder_dev.as_fd()
   }

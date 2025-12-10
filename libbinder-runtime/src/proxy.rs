@@ -23,6 +23,13 @@ impl<ContextManager: BinderObject<ContextManager>> BinderObject<ContextManager> 
   }
 }
 
+impl<ContextManager: BinderObject<ContextManager>> CreateInterfaceObject<ContextManager> for ProxyObject<ContextManager> {
+  fn try_from_remote(runtime: &ArcRuntime<ContextManager>, remote_ref: ProxyObject<ContextManager>) -> Result<Self, ()> {
+    assert!(ArcRuntime::ptr_eq(&runtime, &remote_ref.runtime));
+    Ok(remote_ref)
+  }
+}
+
 pub struct GenericContextManager {
   proxy: ProxyObject<Self>
 }
