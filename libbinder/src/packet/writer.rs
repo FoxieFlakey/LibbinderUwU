@@ -1,6 +1,6 @@
 use std::{ffi::CStr, mem};
 
-use libbinder_raw::object::reference::ObjectRef;
+use libbinder_raw::{object::reference::ObjectRef, types::Type};
 
 use crate::{formats::{InnerWriter, WriteFormat}, packet::builder::PacketBuilder};
 
@@ -95,14 +95,7 @@ impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Fo
   
   pub fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
     let offset = self.format.get_writer_mut().get_current_offset();
-    if !offset.is_multiple_of(size_of::<u32>()) {
-      let bytes_to_align = offset.next_multiple_of(size_of::<u32>()) - offset;
-      for _ in 0..bytes_to_align {
-        self.write_u8(0);
-      }
-    }
-    let offset = self.format.get_writer_mut().get_current_offset();
-    assert!(offset.is_multiple_of(size_of::<u32>()));
+    assert!(offset.is_multiple_of(Type::alignment_in_buffer_needed()), "improper write alignment for object reference");
     
     self.offsets.push(offset);
     obj_ref.with_raw_bytes(|bytes| {

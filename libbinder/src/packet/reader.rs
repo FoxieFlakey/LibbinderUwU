@@ -189,11 +189,8 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
   forward!(read_bool_slice, &'packet [bool]);
   
   pub fn read_reference(&mut self) -> Result<ObjectRef, ()> {
-    let mut peek_offset = self.format.get_reader().get_current_offset();
-    if !peek_offset.is_multiple_of(size_of::<u32>()) {
-      peek_offset = peek_offset.next_multiple_of(size_of::<u32>());
-    }
-    let peek_offset = self.format.get_reader().get_current_offset() - peek_offset;
+    let peek_offset = self.format.get_reader().get_current_offset();
+    assert!(peek_offset.is_multiple_of(Type::alignment_in_buffer_needed()), "improper read alignment for object reference");
     
     let ref_obj = Type::try_from_bytes(self.format.get_reader().peek(Type::bytes_needed(), peek_offset)?)?;
     match ref_obj {
