@@ -29,7 +29,8 @@ pub trait ReadFormat<'reader>: Clone {
   // it does not advance the reader. Mainly used so can compute the length
   // for C string and alike which don't have size written
   fn set_reader(&mut self, reader: Box<dyn InnerReader<'reader>>);
-  fn get_reader(&mut self) -> &mut Box<dyn InnerReader<'reader>>;
+  fn get_reader_mut(&mut self) -> &mut Box<dyn InnerReader<'reader>>;
+  fn get_reader(&self) -> &Box<dyn InnerReader<'reader>>;
   
   fn read_u8(&mut self) -> Result<u8, ()>;
   fn read_u16(&mut self) -> Result<u16, ()>;
@@ -84,7 +85,8 @@ pub trait InnerWriter<'writer> {
 pub trait WriteFormat<'writer> {
   // Set a writer to use
   fn set_writer(&mut self, writer: Box<dyn InnerWriter<'writer> + 'writer>);
-  fn get_writer(&mut self) -> &mut Box<dyn InnerWriter<'writer> + 'writer>;
+  fn get_writer_mut(&mut self) -> &mut Box<dyn InnerWriter<'writer> + 'writer>;
+  fn get_writer(&self) -> &Box<dyn InnerWriter<'writer> + 'writer>;
   
   fn write_u8(&mut self, data: u8);
   fn write_u16(&mut self, data: u16);

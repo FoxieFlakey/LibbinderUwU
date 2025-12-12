@@ -23,56 +23,60 @@ impl<'writer> WriteFormat<'writer> for DeadSimpleFormat<'writer> {
     self.writer = Some(writer);
   }
   
-  fn get_writer(&mut self) -> &mut Box<dyn InnerWriter<'writer> + 'writer> {
+  fn get_writer_mut(&mut self) -> &mut Box<dyn InnerWriter<'writer> + 'writer> {
     self.writer.as_mut().unwrap()
   }
   
+  fn get_writer(&self) -> &Box<dyn InnerWriter<'writer> + 'writer> {
+    self.writer.as_ref().unwrap()
+  }
+  
   fn write_u8(&mut self, data: u8) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_u16(&mut self, data: u16) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_u32(&mut self, data: u32) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_u64(&mut self, data: u64) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_usize(&mut self, data: usize) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_i8(&mut self, data: i8) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_i16(&mut self, data: i16) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_i32(&mut self, data: i32) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_i64(&mut self, data: i64) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_isize(&mut self, data: isize) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_f32(&mut self, data: f32) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_f64(&mut self, data: f64) {
-    self.get_writer().write(&data.to_ne_bytes());
+    self.get_writer_mut().write(&data.to_ne_bytes());
   }
   
   fn write_bool(&mut self, data: bool) {
@@ -84,67 +88,67 @@ impl<'writer> WriteFormat<'writer> for DeadSimpleFormat<'writer> {
   }
   
   fn write_cstr(&mut self, data: &std::ffi::CStr) {
-    self.get_writer().write(data.to_bytes_with_nul());
+    self.get_writer_mut().write(data.to_bytes_with_nul());
   }
   
   fn write_u8_slice(&mut self, data: &[u8]) {
     self.write_usize(data.len());
-    self.get_writer().write(data);
+    self.get_writer_mut().write(data);
   }
   
   fn write_u16_slice(&mut self, data: &[u16]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_u32_slice(&mut self, data: &[u32]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_u64_slice(&mut self, data: &[u64]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_usize_slice(&mut self, data: &[usize]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_i8_slice(&mut self, data: &[i8]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_i16_slice(&mut self, data: &[i16]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_i32_slice(&mut self, data: &[i32]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_i64_slice(&mut self, data: &[i64]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_isize_slice(&mut self, data: &[isize]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_f32_slice(&mut self, data: &[f32]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_f64_slice(&mut self, data: &[f64]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
   
   fn write_str_slice(&mut self, data: &[&str]) {
@@ -163,7 +167,7 @@ impl<'writer> WriteFormat<'writer> for DeadSimpleFormat<'writer> {
   
   fn write_bool_slice(&mut self, data: &[bool]) {
     self.write_usize(data.len());
-    self.get_writer().write(bytemuck::cast_slice(data));
+    self.get_writer_mut().write(bytemuck::cast_slice(data));
   }
 }
 
@@ -191,7 +195,7 @@ macro_rules! impl_slice {
   ($name:ident, $type:ty) => {
     fn $name(&mut self) -> Result<SliceReadResult<'reader, $type>, ()> {
       let length = self.read_usize()?;
-      let bytes = self.get_reader().read(length * size_of::<$type>())?;
+      let bytes = self.get_reader_mut().read(length * size_of::<$type>())?;
       // Ensure that reader actually read all byte necessary
       assert!(bytes.len() == length * size_of::<$type>());
       Ok(
@@ -232,7 +236,7 @@ macro_rules! impl_slice {
 }
 
 impl<'reader> ReadFormat<'reader> for DeadSimpleFormatReader<'reader> {
-  fn get_reader(&mut self) -> &mut Box<dyn InnerReader<'reader>> {
+  fn get_reader_mut(&mut self) -> &mut Box<dyn InnerReader<'reader>> {
     self.reader.as_mut().unwrap()
   }
   
@@ -240,63 +244,67 @@ impl<'reader> ReadFormat<'reader> for DeadSimpleFormatReader<'reader> {
     self.reader = Some(reader);
   }
   
+  fn get_reader(&self) -> &Box<dyn InnerReader<'reader>> {
+    self.reader.as_ref().unwrap()
+  }
+  
   fn read_u8(&mut self) -> Result<u8, ()> {
-    self.get_reader().read(1)
+    self.get_reader_mut().read(1)
       .map(|x| x[0])
   }
   
   fn read_u16(&mut self) -> Result<u16, ()> {
-    self.get_reader().read(2)
+    self.get_reader_mut().read(2)
       .map(|x| u16::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_u32(&mut self) -> Result<u32, ()> {
-    self.get_reader().read(4)
+    self.get_reader_mut().read(4)
       .map(|x| u32::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_u64(&mut self) -> Result<u64, ()> {
-    self.get_reader().read(8)
+    self.get_reader_mut().read(8)
       .map(|x| u64::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_usize(&mut self) -> Result<usize, ()> {
-    self.get_reader().read(size_of::<usize>())
+    self.get_reader_mut().read(size_of::<usize>())
       .map(|x| usize::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_i8(&mut self) -> Result<i8, ()> {
-    self.get_reader().read(1)
+    self.get_reader_mut().read(1)
       .map(|x| i8::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_i16(&mut self) -> Result<i16, ()> {
-    self.get_reader().read(2)
+    self.get_reader_mut().read(2)
       .map(|x| i16::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_i32(&mut self) -> Result<i32, ()> {
-    self.get_reader().read(4)
+    self.get_reader_mut().read(4)
       .map(|x| i32::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_i64(&mut self) -> Result<i64, ()> {
-    self.get_reader().read(8)
+    self.get_reader_mut().read(8)
       .map(|x| i64::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_isize(&mut self) -> Result<isize, ()> {
-    self.get_reader().read(size_of::<isize>())
+    self.get_reader_mut().read(size_of::<isize>())
       .map(|x| isize::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_f32(&mut self) -> Result<f32, ()> {
-    self.get_reader().read(size_of::<f32>())
+    self.get_reader_mut().read(size_of::<f32>())
       .map(|x| f32::from_ne_bytes(x.try_into().unwrap()))
   }
   
   fn read_f64(&mut self) -> Result<f64, ()> {
-    self.get_reader().read(size_of::<f64>())
+    self.get_reader_mut().read(size_of::<f64>())
       .map(|x| f64::from_ne_bytes(x.try_into().unwrap()))
   }
   
@@ -315,19 +323,19 @@ impl<'reader> ReadFormat<'reader> for DeadSimpleFormatReader<'reader> {
     // Find the length of CString
     let mut length = 0;
     loop {
-      let current = self.get_reader().peek(1, /* length is also offset */ length)?;
+      let current = self.get_reader_mut().peek(1, /* length is also offset */ length)?;
       if current[0] == 0 {
         break;
       }
       length += 1;
     }
     
-    Ok(CStr::from_bytes_with_nul(self.get_reader().read(length)?).unwrap())
+    Ok(CStr::from_bytes_with_nul(self.get_reader_mut().read(length)?).unwrap())
   }
   
   fn read_str(&mut self) -> Result<&'reader str, ()> {
     let length = self.read_usize()?;
-    let bytes = self.get_reader().read(length)?;
+    let bytes = self.get_reader_mut().read(length)?;
     assert!(bytes.len() == length);
     str::from_utf8(bytes)
       .map_err(|_| ())
@@ -335,7 +343,7 @@ impl<'reader> ReadFormat<'reader> for DeadSimpleFormatReader<'reader> {
   
   fn read_u8_slice(&mut self) -> Result<&'reader [u8], ()> {
     let length = self.read_usize()?;
-    let bytes = self.get_reader().read(length)?;
+    let bytes = self.get_reader_mut().read(length)?;
     assert!(bytes.len() == length);
     Ok(bytes)
   }
@@ -346,7 +354,7 @@ impl<'reader> ReadFormat<'reader> for DeadSimpleFormatReader<'reader> {
   
   fn read_i8_slice(&mut self) -> Result<&'reader [i8], ()> {
     let length = self.read_usize()?;
-    Ok(bytemuck::cast_slice(self.get_reader().read(length)?))
+    Ok(bytemuck::cast_slice(self.get_reader_mut().read(length)?))
   }
   impl_slice!(read_i16_slice, i16);
   impl_slice!(read_i32_slice, i32);

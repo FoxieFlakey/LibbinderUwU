@@ -30,7 +30,7 @@ impl InnerWriter<'_> for WriterState {
 
 impl<'packet, Format: WriteFormat<'packet>> Drop for Writer<'packet, '_, Format> {
   fn drop(&mut self) {
-    mem::swap(self.format.get_writer().get_data_buffer_mut(), &mut self.result.data_buffer);
+    mem::swap(self.format.get_writer_mut().get_data_buffer_mut(), &mut self.result.data_buffer);
     mem::swap(&mut self.result.offsets_buffer, &mut self.offsets);
   }
 }
@@ -50,7 +50,7 @@ impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Fo
   }
   
   pub fn get_current_offset(&mut self) -> usize {
-    self.format.get_writer().get_current_offset()
+    self.format.get_writer_mut().get_current_offset()
   }
 }
 
@@ -98,19 +98,19 @@ impl<'packet, 'binder, Format: WriteFormat<'packet>> Writer<'packet, 'binder, Fo
   // BR_RELEASE and need to ensure its correct reference for correct
   // binder device
   pub unsafe fn write_obj_ref(&mut self, obj_ref: ObjectRef) {
-    let offset = self.format.get_writer().get_current_offset();
+    let offset = self.format.get_writer_mut().get_current_offset();
     if !offset.is_multiple_of(size_of::<u32>()) {
       let bytes_to_align = offset.next_multiple_of(size_of::<u32>()) - offset;
       for _ in 0..bytes_to_align {
         self.write_u8(0);
       }
     }
-    let offset = self.format.get_writer().get_current_offset();
+    let offset = self.format.get_writer_mut().get_current_offset();
     assert!(offset.is_multiple_of(size_of::<u32>()));
     
     self.offsets.push(offset);
     obj_ref.with_raw_bytes(|bytes| {
-      self.format.get_writer().write(bytes);
+      self.format.get_writer_mut().write(bytes);
     });
   }
 }

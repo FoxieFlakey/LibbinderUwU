@@ -117,7 +117,7 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
     }
   }
   
-  pub fn get_current_offset(&mut self) -> usize {
+  pub fn get_current_offset(&self) -> usize {
     self.format.get_reader().get_current_offset()
   }
   
@@ -203,7 +203,7 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
         let result = ObjectRef::try_from_bytes(bytes)?;
         
         // The data was successfully read, lets just advance the reader state
-        self.format.get_reader().read(type_size + peek_offset).unwrap();
+        self.format.get_reader_mut().read(type_size + peek_offset).unwrap();
         Ok(result)
       }
       _ => Err(())
