@@ -38,6 +38,14 @@ impl Type {
     size_of::<ObjectHeaderRaw>()
   }
   
+  // This is alignment for the object offset inside
+  // the data buffer (the alignment of the data buffer itself is ignored)
+  pub fn alignment_in_buffer_needed() -> usize {
+    // All requires 32-bit aligned
+    // See https://github.com/torvalds/linux/blob/3f9f0252130e7dd60d41be0802bf58f6471c691d/drivers/android/binder.c#L1792
+    size_of::<u32>()
+  }
+  
   pub fn from_bytes(bytes: &[u8]) -> Type {
     Self::try_from_bytes(bytes).unwrap()
   }
