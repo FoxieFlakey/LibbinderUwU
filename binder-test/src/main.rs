@@ -6,10 +6,7 @@ use libbinder_runtime::{BINDER_COMPILED_VERSION, binder_version};
 use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
 mod common;
-mod service_manager;
 mod process_sync;
-mod app;
-mod interface;
 
 pub fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<32>();
@@ -43,8 +40,7 @@ fn main() {
   println!("Binder version on kernel is {} while libkernel compiled for {}", ver.version, BINDER_COMPILED_VERSION.version);
   
   [
-    divide(|| service_manager::main()),
-    divide(|| app::main())
+    divide(|| println!("Do nothing"))
   ].iter().for_each(|pid| {
     waitpid(*pid, None).unwrap();
   });
