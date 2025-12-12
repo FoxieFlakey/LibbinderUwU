@@ -1,4 +1,4 @@
-use std::{borrow::Cow, io, marker::PhantomData, os::fd::{AsFd, BorrowedFd}};
+use std::{borrow::Cow, io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd}};
 
 use libbinder_raw::{commands::Command as CommandRaw, write_read::binder_read_write};
 use nix::{errno::Errno, poll::{PollFd, PollFlags, PollTimeout, poll}};
@@ -72,6 +72,8 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
       Command::ExitLooper => self.buffer.extend_from_slice(&CommandRaw::ExitLooper.as_bytes()),
       Command::RegisterLooper => self.buffer.extend_from_slice(&CommandRaw::RegisterLooper.as_bytes()),
       Command::SendReply(packet) => {
+        assert!(packet.get_binder_dev().as_raw_fd() == self.binder_dev.as_raw_fd(), "attempt to send packet belonging different binder device");
+        
         self.buffer.extend_from_slice(&CommandRaw::SendReply.as_bytes());
         packet.get_transaction()
           .with_bytes(|x| {
@@ -79,6 +81,8 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
           });
       },
       Command::SendTransaction(packet) => {
+        assert!(packet.get_binder_dev().as_raw_fd() == self.binder_dev.as_raw_fd(), "attempt to send packet belonging different binder device");
+        
         self.buffer.extend_from_slice(&CommandRaw::SendTransaction.as_bytes());
         packet.get_transaction()
           .with_bytes(|x| {
