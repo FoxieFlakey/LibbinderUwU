@@ -123,6 +123,10 @@ impl<'binder> Packet<'binder> {
     self.transaction.get_common().code
   }
   
+  pub fn get_flags(&self) -> BitFlags<TransactionFlag> {
+    self.transaction.get_common().flags
+  }
+  
   pub fn get_binder_dev(&self) -> BorrowedFd<'binder> {
     self.binder_dev
   }

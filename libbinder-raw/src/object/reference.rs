@@ -2,7 +2,7 @@ use bytemuck::{Pod, Zeroable};
 use bytemuck_utils::PodData;
 use enumflags2::{BitFlag, BitFlags, bitflags};
 
-use crate::{BinderUsize, object::{self, ObjectHeaderRaw}};
+use crate::{BinderUsize, object::{self, ObjectHeaderRaw}, types::Type};
 
 #[bitflags]
 #[repr(u32)]
