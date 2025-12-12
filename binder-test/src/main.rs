@@ -1,8 +1,7 @@
 #![feature(never_type)]
 
-use std::{fmt::Write, fs::File, os::fd::AsFd, process::exit};
+use std::{fmt::Write, fs::File, process::exit};
 
-use libbinder_runtime::{BINDER_COMPILED_VERSION, binder_version};
 use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
 mod common;
@@ -36,8 +35,6 @@ fn divide<F: FnOnce()>(on_child: F) -> Pid {
 
 fn main() {
   let binder_dev = File::open("/dev/binder").unwrap();
-  let ver = binder_version(binder_dev.as_fd()).unwrap();
-  println!("Binder version on kernel is {} while libkernel compiled for {}", ver.version, BINDER_COMPILED_VERSION.version);
   
   [
     divide(|| println!("Do nothing"))

@@ -1,15 +1,15 @@
-use std::{io, marker::PhantomData, os::fd::{AsFd, BorrowedFd}};
+use std::{borrow::Cow, io, marker::PhantomData, os::fd::{AsFd, BorrowedFd}};
 
-use libbinder_raw::{commands::Command as CommandRaw, transaction::Transaction, write_read::binder_read_write};
+use libbinder_raw::{commands::Command as CommandRaw, write_read::binder_read_write};
 use nix::{errno::Errno, poll::{PollFd, PollFlags, PollTimeout, poll}};
 
-use crate::return_buffer::ReturnBuffer;
+use crate::{packet::Packet, return_buffer::ReturnBuffer};
 
-pub enum Command<'binder, 'data> {
+pub enum Command<'binder, 'data: 'binder> {
   EnterLooper,
   ExitLooper,
-  SendTransaction(Transaction<'binder, 'data, 'data>),
-  SendReply(Transaction<'binder, 'data, 'data>),
+  SendTransaction(Cow<'data, Packet<'binder>>),
+  SendReply(Cow<'data, Packet<'binder>>),
   RegisterLooper
 }
 
@@ -71,17 +71,19 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
       Command::EnterLooper => self.buffer.extend_from_slice(&CommandRaw::EnterLooper.as_bytes()),
       Command::ExitLooper => self.buffer.extend_from_slice(&CommandRaw::ExitLooper.as_bytes()),
       Command::RegisterLooper => self.buffer.extend_from_slice(&CommandRaw::RegisterLooper.as_bytes()),
-      Command::SendReply(transaction) => {
+      Command::SendReply(packet) => {
         self.buffer.extend_from_slice(&CommandRaw::SendReply.as_bytes());
-        transaction.with_bytes(|x| {
-          self.buffer.extend_from_slice(x);
-        });
+        packet.get_transaction()
+          .with_bytes(|x| {
+            self.buffer.extend_from_slice(x);
+          });
       },
-      Command::SendTransaction(transaction) => {
+      Command::SendTransaction(packet) => {
         self.buffer.extend_from_slice(&CommandRaw::SendTransaction.as_bytes());
-        transaction.with_bytes(|x| {
-          self.buffer.extend_from_slice(x);
-        });
+        packet.get_transaction()
+          .with_bytes(|x| {
+            self.buffer.extend_from_slice(x);
+          });
       }
     }
     
