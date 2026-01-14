@@ -12,7 +12,7 @@ pub trait Object<Mgr: Object<Mgr>>: Sync + Send + Any + 'static {
   // implementer to be able to use Rust's ? and plus the runtime
   // doesn't really care if its Ok or Err, at the end it gets a
   // packet lol
-  fn on_packet<'runtime>(&self, packet: &Packet<'runtime>) -> Result<Packet<'runtime>, Packet<'runtime>>;
+  fn on_packet<'runtime>(&self, packet: &Packet<'_, Mgr>) -> Result<Packet<'runtime, Mgr>, Packet<'runtime, Mgr>>;
 }
 
 

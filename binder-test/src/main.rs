@@ -2,6 +2,7 @@
 
 use std::{fmt::Write, fs::File, process::exit};
 
+use libbinder_runtime::{object::Object, packet::dead_simple::DeadSimpleFormat};
 use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
 mod common;
@@ -34,10 +35,19 @@ fn divide<F: FnOnce()>(on_child: F) -> Pid {
 }
 
 fn main() {
-  let binder_dev = File::open("/dev/binder").unwrap();
-  
   [
-    divide(|| println!("Do nothing"))
+    divide(|| {
+      let binder_dev = File::open("/dev/binder").unwrap();
+      let rt = libbinder_runtime::new_proxy_manager(binder_dev).unwrap();
+      let mut packet = rt.new_packet();
+      packet
+        .set_code(0)
+        .writer(DeadSimpleFormat::new())
+        .write_str("Hello World!")
+        .write_bool(true);
+      
+      let _ = rt.get_manager().on_packet(&packet.build());
+    })
   ].iter().for_each(|pid| {
     waitpid(*pid, None).unwrap();
   });
