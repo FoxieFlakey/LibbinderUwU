@@ -120,6 +120,31 @@ impl<'binder> ReturnBuffer<'binder> {
       self.parsed.push(val);
     }
   }
+  
+  // The .0 is cleared and .1 is in unknown state
+  // This method mainly useful to convert this buffer into
+  // underlying buffers for reuse later under different binder
+  // fd.
+  pub fn into_buffers(mut self) -> (Vec<ReturnValue<'static>>, Vec<u8>) {
+    self.parsed.clear();
+    
+    // SAFETY: This is safe as the buffer are empty so nothing borrows non static
+    // anymore
+    let buf = unsafe { std::mem::transmute(self.parsed) };
+    (buf, self.buffer)
+  }
+  
+  // Data inside the buffers are cleared unconditionally
+  pub fn from_buffers(binder_dev: BorrowedFd<'binder>, mut raw: (Vec<ReturnValue<'static>>, Vec<u8>)) -> Self {
+    raw.0.clear();
+    raw.1.clear();
+    
+    Self {
+      parsed: raw.0,
+      buffer: raw.1,
+      binder_dev
+    }
+  }
 }
 
 
