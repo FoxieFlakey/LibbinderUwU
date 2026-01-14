@@ -5,7 +5,7 @@ use nix::{errno::Errno, poll::{PollFd, PollFlags, PollTimeout, poll}};
 
 use crate::{packet::Packet, return_buffer::ReturnBuffer};
 
-pub enum Command<'binder, 'data: 'binder> {
+pub enum Command<'binder: 'data, 'data> {
   EnterLooper,
   ExitLooper,
   SendTransaction(ObjectRefRemote, Cow<'data, Packet<'binder>>),

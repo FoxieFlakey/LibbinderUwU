@@ -18,7 +18,7 @@ pub enum TransactionError {
 // Runtime will store the strong reference to object if its
 // sent outside
 pub trait Object<Mgr: Object<Mgr>>: Sync + Send + Any + 'static {
-  fn do_transaction<'runtime>(&self, packet: &'runtime Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError>;
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError>;
 }
 
 pub(crate) struct BoxedObject<Mgr: Object<Mgr>> {

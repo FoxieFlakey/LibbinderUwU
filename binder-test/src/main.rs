@@ -41,7 +41,7 @@ fn main() {
       struct ContextManager;
       
       impl Object<ContextManager> for ContextManager {
-        fn do_transaction<'runtime>(&self, packet: &'runtime libbinder_runtime::packet::Packet<'runtime, ContextManager>) -> Result<libbinder_runtime::packet::Packet<'runtime, ContextManager>, libbinder_runtime::object::TransactionError> {
+        fn do_transaction<'packet, 'runtime>(&self, packet: &'packet libbinder_runtime::packet::Packet<'runtime, ContextManager>) -> Result<libbinder_runtime::packet::Packet<'runtime, ContextManager>, libbinder_runtime::object::TransactionError> {
           panic!("TODO");
         }
       }

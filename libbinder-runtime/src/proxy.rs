@@ -1,9 +1,9 @@
 use std::{borrow::Cow, error::Error, fmt::Display};
 
-use libbinder::{command_buffer::{Command, CommandBuffer}, return_buffer::{ReturnBuffer, ReturnValue}};
+use libbinder::{command_buffer::Command, return_buffer::ReturnValue};
 use libbinder_raw::types::reference::ObjectRefRemote;
 
-use crate::{WeakRuntime, object::{Object, TransactionError}, packet::Packet};
+use crate::{WeakRuntime, context::Context, object::{Object, TransactionError}, packet::Packet};
 
 pub struct Proxy<Mgr: Object<Mgr>> {
   runtime: WeakRuntime<Mgr>,
@@ -20,47 +20,44 @@ impl<Mgr: Object<Mgr>> Proxy<Mgr> {
 }
 
 impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
-  fn do_transaction<'runtime>(&self, packet: &'runtime Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError> {
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError> {
     assert!(
       self.runtime.ptr_eq(&packet.get_runtime().downgrade()),
       "attempting to send packet belonging to other runtime"
     );
     
-    let rt: &'runtime crate::ArcRuntime<Mgr> = packet.get_runtime();
-    let binder_dev: std::os::unix::prelude::BorrowedFd<'runtime> = rt.get_binder();
-    let mut ret_buf: ReturnBuffer<'runtime> = ReturnBuffer::new(binder_dev, 64 * 1024);
-    let mut cmd_buf = CommandBuffer::new(binder_dev);
+    let rt = packet.get_runtime();
+    let ctx = rt.____rt.exec_context.get_or(|| Context::new(rt.clone()));
+    let mut ret = None;
     
-    cmd_buf.enqueue_command(Command::SendTransaction(self.remote_ref, Cow::Borrowed(&packet.packet)));
-    match cmd_buf.exec_always_block(Some(&mut ret_buf)) {
-      Ok(()) => {},
-      Err((idx, e)) => {
-        panic!("Error executing command at index {idx} because of: {e}")
-      }
-    }
-    
-    for ret in ret_buf.get_parsed() {
-      match ret {
+    ctx.exec(rt, |cmd_buf| {
+      cmd_buf.enqueue_command(Command::SendTransaction(self.remote_ref.clone(), Cow::Borrowed(&packet.packet)));
+    }, |v| {
+      match v {
         ReturnValue::Transaction(_) => todo!(),
-        ReturnValue::Acquire(object_ref_local) => todo!(),
-        ReturnValue::AcquireWeak(object_ref_local) => todo!(),
-        ReturnValue::Release(object_ref_local) => todo!(),
-        ReturnValue::ReleaseWeak(object_ref_local) => todo!(),
+        ReturnValue::Acquire(_) => todo!(),
+        ReturnValue::AcquireWeak(_) => todo!(),
+        ReturnValue::Release(_) => todo!(),
+        ReturnValue::ReleaseWeak(_) => todo!(),
         ReturnValue::Reply(packet) => {
-          return Ok(Packet {
+          assert!(ret.is_none());
+          ret = Some(Ok(Packet {
             runtime: rt,
             packet: packet.clone()
-          })
+          }));
         },
         ReturnValue::TransactionFailed => todo!(),
         ReturnValue::Ok => todo!(),
         ReturnValue::Error(_) => todo!(),
         ReturnValue::SpawnLooper => todo!(),
         ReturnValue::TransactionComplete => println!("Transaction complete"),
-        ReturnValue::DeadReply => return Err(TransactionError::DeadTarget),
+        ReturnValue::DeadReply => {
+          assert!(ret.is_none());
+          ret = Some(Err(TransactionError::DeadTarget));
+        },
         ReturnValue::Noop => ()
       }
-    }
+    });
     
     #[derive(Debug)]
     struct ErrorMsg(&'static str);
@@ -81,7 +78,7 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
 pub struct SelfMananger(pub Proxy<SelfMananger>);
 
 impl Object<SelfMananger> for SelfMananger {
-  fn do_transaction<'runtime>(&self, packet: &'runtime Packet<'runtime, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, TransactionError> {
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, TransactionError> {
     self.0.do_transaction(packet)
   }
 }
