@@ -1,8 +1,8 @@
 #![feature(never_type)]
 
-use std::{fmt::Write, fs::File, process::exit};
+use std::{fmt::Write, fs::File, process::exit, sync::Arc, thread, time::Duration};
 
-use libbinder_runtime::{object::Object, packet::dead_simple::DeadSimpleFormat};
+use libbinder_runtime::{ArcRuntime, object::Object, packet::dead_simple::DeadSimpleFormat};
 use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
 
 mod common;
@@ -37,6 +37,24 @@ fn divide<F: FnOnce()>(on_child: F) -> Pid {
 fn main() {
   [
     divide(|| {
+      let binder_dev = File::open("/dev/binder").unwrap();
+      struct ContextManager;
+      
+      impl Object<ContextManager> for ContextManager {
+        fn do_transaction<'runtime>(&self, packet: &'runtime libbinder_runtime::packet::Packet<'runtime, ContextManager>) -> Result<libbinder_runtime::packet::Packet<'runtime, ContextManager>, libbinder_runtime::object::TransactionError> {
+          panic!("TODO");
+        }
+      }
+      
+      let rt = ArcRuntime::new_as_manager(binder_dev, |weak_rt| {
+        Arc::new(ContextManager)
+      });
+      
+      thread::sleep(Duration::from_secs(3));
+    }),
+    divide(|| {
+      thread::sleep(Duration::from_secs(1));
+      
       let binder_dev = File::open("/dev/binder").unwrap();
       let rt = libbinder_runtime::new_proxy_manager(binder_dev).unwrap();
       let mut packet = rt.new_packet();

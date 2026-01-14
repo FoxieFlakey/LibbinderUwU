@@ -56,7 +56,7 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
         ReturnValue::Ok => todo!(),
         ReturnValue::Error(_) => todo!(),
         ReturnValue::SpawnLooper => todo!(),
-        ReturnValue::TransactionComplete => todo!(),
+        ReturnValue::TransactionComplete => println!("Transaction complete"),
         ReturnValue::DeadReply => return Err(TransactionError::DeadTarget),
         ReturnValue::Noop => ()
       }
