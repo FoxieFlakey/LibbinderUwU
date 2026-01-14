@@ -1,18 +1,24 @@
-use std::{os::fd::{AsFd, BorrowedFd, OwnedFd}, sync::{Arc, Weak}};
+use std::{os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Weak}};
 
 use libbinder::packet::builder::PacketBuilder as libbinder_PacketBuilder;
 use libbinder_raw::types::reference::CONTEXT_MANAGER_REF;
+use nix::libc;
 
-use crate::{object::Object, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}};
+use crate::{object::Object, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap};
 
 pub mod object;
 pub mod packet;
 pub mod proxy;
 
-#[derive(Clone)]
+mod util;
+
 pub(crate) struct Shared<Mgr: Object<Mgr>> {
   binder_dev: Arc<OwnedFd>,
-  mgr: Arc<Mgr>
+  mgr: Arc<Mgr>,
+  
+  // Used by Binder to store incoming transaction and buffer :3
+  // don't need to be used
+  _binder_mem: OwnedMmap
 }
 
 #[derive(Clone)]
@@ -43,6 +49,23 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     where F: FnOnce(WeakRuntime<Mgr>) -> Arc<Mgr>
   {
     let binder_dev = Arc::new(binder_dev.into());
+    let binder_mem = {
+      let len = 8 * 1024 * 1024;
+      let ptr = unsafe {
+          libc::mmap(ptr::null_mut(),
+            len,
+            libc::PROT_READ,
+            libc::MAP_PRIVATE,
+            binder_dev.as_raw_fd(),
+            0
+          )
+        };
+      
+      OwnedMmap {
+        ptr: ptr.cast(),
+        len
+      }
+    };
     
     Ok(ArcRuntime {
       ____rt: Arc::new_cyclic(|weak| {
@@ -50,7 +73,8 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
         
         Shared {
           mgr: manager_provider(weak_rt),
-          binder_dev,
+          _binder_mem: binder_mem,
+          binder_dev
         }
       })
     })

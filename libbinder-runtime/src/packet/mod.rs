@@ -8,12 +8,12 @@ pub use libbinder::formats::*;
 
 #[derive(Clone)]
 pub struct Packet<'runtime, Mgr: Object<Mgr>> {
-  runtime: &'runtime ArcRuntime<Mgr>,
+  pub(crate) runtime: &'runtime ArcRuntime<Mgr>,
   pub(crate) packet: libbinder::packet::Packet<'runtime>
 }
 
 impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr>> Packet<'runtime, Mgr> {
-  pub fn get_runtime(&self) -> &ArcRuntime<Mgr> {
+  pub fn get_runtime(&self) -> &'runtime ArcRuntime<Mgr> {
     self.runtime
   }
   

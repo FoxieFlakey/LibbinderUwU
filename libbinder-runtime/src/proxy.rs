@@ -20,14 +20,15 @@ impl<Mgr: Object<Mgr>> Proxy<Mgr> {
 }
 
 impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
-  fn do_transaction<'runtime>(&self, packet: &Packet<'_, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError> {
+  fn do_transaction<'runtime>(&self, packet: &'runtime Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError> {
     assert!(
       self.runtime.ptr_eq(&packet.get_runtime().downgrade()),
       "attempting to send packet belonging to other runtime"
     );
     
-    let binder_dev = packet.get_runtime().get_binder();
-    let mut ret_buf = ReturnBuffer::new(binder_dev, 64 * 1024);
+    let rt: &'runtime crate::ArcRuntime<Mgr> = packet.get_runtime();
+    let binder_dev: std::os::unix::prelude::BorrowedFd<'runtime> = rt.get_binder();
+    let mut ret_buf: ReturnBuffer<'runtime> = ReturnBuffer::new(binder_dev, 64 * 1024);
     let mut cmd_buf = CommandBuffer::new(binder_dev);
     
     cmd_buf.enqueue_command(Command::SendTransaction(self.remote_ref, Cow::Borrowed(&packet.packet)));
@@ -45,7 +46,12 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
         ReturnValue::AcquireWeak(object_ref_local) => todo!(),
         ReturnValue::Release(object_ref_local) => todo!(),
         ReturnValue::ReleaseWeak(object_ref_local) => todo!(),
-        ReturnValue::Reply(packet) => todo!(),
+        ReturnValue::Reply(packet) => {
+          return Ok(Packet {
+            runtime: rt,
+            packet: packet.clone()
+          })
+        },
         ReturnValue::TransactionFailed => todo!(),
         ReturnValue::Ok => todo!(),
         ReturnValue::Error(_) => todo!(),
@@ -75,7 +81,7 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
 pub struct SelfMananger(pub Proxy<SelfMananger>);
 
 impl Object<SelfMananger> for SelfMananger {
-  fn do_transaction<'runtime>(&self, packet: &Packet<'_, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, TransactionError> {
+  fn do_transaction<'runtime>(&self, packet: &'runtime Packet<'runtime, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, TransactionError> {
     self.0.do_transaction(packet)
   }
 }
