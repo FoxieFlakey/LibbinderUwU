@@ -46,7 +46,7 @@ fn main() {
         .write_str("Hello World!")
         .write_bool(true);
       
-      let _ = rt.get_manager().do_transaction(&packet.build());
+      rt.get_manager().do_transaction(&packet.build()).unwrap();
     })
   ].iter().for_each(|pid| {
     waitpid(*pid, None).unwrap();

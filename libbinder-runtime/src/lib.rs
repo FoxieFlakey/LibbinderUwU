@@ -3,7 +3,7 @@ use std::{os::fd::{AsFd, BorrowedFd, OwnedFd}, sync::{Arc, Weak}};
 use libbinder::packet::builder::PacketBuilder as libbinder_PacketBuilder;
 use libbinder_raw::types::reference::CONTEXT_MANAGER_REF;
 
-use crate::{object::Object, packet::{Packet, builder::PacketBuilder}, proxy::{Proxy, SelfMananger}};
+use crate::{object::Object, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}};
 
 pub mod object;
 pub mod packet;
@@ -64,13 +64,6 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     PacketBuilder {
       builder: libbinder_PacketBuilder::new(self.____rt.binder_dev.as_fd()),
       runtime: self
-    }
-  }
-  
-  pub fn send<'runtime, T: Object<Mgr>>(target: &Arc<T>, packet: &Packet<'_, Mgr>) -> Packet<'runtime, Mgr> {
-    match target.do_transaction(packet) {
-      Ok(ret) => ret,
-      Err(ret) => ret
     }
   }
   

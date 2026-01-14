@@ -1,9 +1,9 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, error::Error, fmt::Display};
 
-use libbinder::{command_buffer::{Command, CommandBuffer}, return_buffer::ReturnBuffer};
+use libbinder::{command_buffer::{Command, CommandBuffer}, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::types::reference::ObjectRefRemote;
 
-use crate::{WeakRuntime, object::Object, packet::Packet};
+use crate::{WeakRuntime, object::{Object, TransactionError}, packet::Packet};
 
 pub struct Proxy<Mgr: Object<Mgr>> {
   runtime: WeakRuntime<Mgr>,
@@ -20,7 +20,7 @@ impl<Mgr: Object<Mgr>> Proxy<Mgr> {
 }
 
 impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
-  fn do_transaction<'runtime>(&self, packet: &Packet<'_, Mgr>) -> Result<Packet<'runtime, Mgr>, Packet<'runtime, Mgr>> {
+  fn do_transaction<'runtime>(&self, packet: &Packet<'_, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError> {
     assert!(
       self.runtime.ptr_eq(&packet.get_runtime().downgrade()),
       "attempting to send packet belonging to other runtime"
@@ -38,14 +38,44 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
       }
     }
     
-    todo!();
+    for ret in ret_buf.get_parsed() {
+      match ret {
+        ReturnValue::Transaction(_) => todo!(),
+        ReturnValue::Acquire(object_ref_local) => todo!(),
+        ReturnValue::AcquireWeak(object_ref_local) => todo!(),
+        ReturnValue::Release(object_ref_local) => todo!(),
+        ReturnValue::ReleaseWeak(object_ref_local) => todo!(),
+        ReturnValue::Reply(packet) => todo!(),
+        ReturnValue::TransactionFailed => todo!(),
+        ReturnValue::Ok => todo!(),
+        ReturnValue::Error(_) => todo!(),
+        ReturnValue::SpawnLooper => todo!(),
+        ReturnValue::TransactionComplete => todo!(),
+        ReturnValue::DeadReply => return Err(TransactionError::DeadTarget),
+        ReturnValue::Noop => ()
+      }
+    }
+    
+    #[derive(Debug)]
+    struct ErrorMsg(&'static str);
+    
+    impl Display for ErrorMsg {
+      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+      }
+    }
+    
+    impl Error for ErrorMsg {
+    }
+    
+    Err(TransactionError::MiscellanousError(Box::new(ErrorMsg("Error Unexpected"))))
   }
 }
 
 pub struct SelfMananger(pub Proxy<SelfMananger>);
 
 impl Object<SelfMananger> for SelfMananger {
-  fn do_transaction<'runtime>(&self, packet: &Packet<'_, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, Packet<'runtime, SelfMananger>> {
+  fn do_transaction<'runtime>(&self, packet: &Packet<'_, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, TransactionError> {
     self.0.do_transaction(packet)
   }
 }
