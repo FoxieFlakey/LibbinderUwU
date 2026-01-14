@@ -76,14 +76,14 @@ impl ObjectRef {
   }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct ObjectRefLocal {
   // Whatever data can be in these, kernel won't touch it
   pub data: usize,
   pub extra_data: usize
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct ObjectRefRemote {
   pub data_handle: u32
 }
