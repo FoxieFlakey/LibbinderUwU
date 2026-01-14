@@ -68,7 +68,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   }
   
   pub fn send<'runtime, T: Object<Mgr>>(target: &Arc<T>, packet: &Packet<'_, Mgr>) -> Packet<'runtime, Mgr> {
-    match target.on_packet(packet) {
+    match target.do_transaction(packet) {
       Ok(ret) => ret,
       Err(ret) => ret
     }

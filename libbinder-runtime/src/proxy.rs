@@ -20,7 +20,7 @@ impl<Mgr: Object<Mgr>> Proxy<Mgr> {
 }
 
 impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
-  fn on_packet<'runtime>(&self, packet: &Packet<'_, Mgr>) -> Result<Packet<'runtime, Mgr>, Packet<'runtime, Mgr>> {
+  fn do_transaction<'runtime>(&self, packet: &Packet<'_, Mgr>) -> Result<Packet<'runtime, Mgr>, Packet<'runtime, Mgr>> {
     assert!(
       self.runtime.ptr_eq(&packet.get_runtime().downgrade()),
       "attempting to send packet belonging to other runtime"
@@ -45,8 +45,8 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
 pub struct SelfMananger(pub Proxy<SelfMananger>);
 
 impl Object<SelfMananger> for SelfMananger {
-  fn on_packet<'runtime>(&self, packet: &Packet<'_, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, Packet<'runtime, SelfMananger>> {
-    self.0.on_packet(packet)
+  fn do_transaction<'runtime>(&self, packet: &Packet<'_, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, Packet<'runtime, SelfMananger>> {
+    self.0.do_transaction(packet)
   }
 }
 
