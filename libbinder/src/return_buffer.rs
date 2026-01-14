@@ -134,10 +134,10 @@ impl<'binder> ReturnBuffer<'binder> {
     (buf, self.buffer)
   }
   
-  // Data inside the buffers are cleared unconditionally
+  // .0 is cleared
+  // while .1 is left as it is but will be overwritten
   pub fn from_buffers(binder_dev: BorrowedFd<'binder>, mut raw: (Vec<ReturnValue<'static>>, Vec<u8>)) -> Self {
     raw.0.clear();
-    raw.1.clear();
     
     Self {
       parsed: raw.0,
