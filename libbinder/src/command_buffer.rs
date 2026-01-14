@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, marker::PhantomData, os::fd::{AsFd, AsRawFd, BorrowedFd}};
 
-use libbinder_raw::{commands::Command as CommandRaw, types::reference::ObjectRef, write_read::binder_read_write};
+use libbinder_raw::{commands::Command as CommandRaw, types::reference::{ObjectRef, ObjectRefRemote}, write_read::binder_read_write};
 use nix::{errno::Errno, poll::{PollFd, PollFlags, PollTimeout, poll}};
 
 use crate::{packet::Packet, return_buffer::ReturnBuffer};
@@ -8,7 +8,7 @@ use crate::{packet::Packet, return_buffer::ReturnBuffer};
 pub enum Command<'binder, 'data: 'binder> {
   EnterLooper,
   ExitLooper,
-  SendTransaction(ObjectRef, Cow<'data, Packet<'binder>>),
+  SendTransaction(ObjectRefRemote, Cow<'data, Packet<'binder>>),
   SendReply(Cow<'data, Packet<'binder>>),
   RegisterLooper
 }
@@ -85,7 +85,7 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
         
         self.buffer.extend_from_slice(&CommandRaw::SendTransaction.as_bytes());
         let mut transact = packet.get_transaction().clone();
-        transact.with_common_mut(|common| common.target = target);
+        transact.with_common_mut(|common| common.target = ObjectRef::Remote(target));
         transact.with_bytes(|bytes| {
           self.buffer.extend_from_slice(bytes);
         })
