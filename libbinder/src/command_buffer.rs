@@ -220,5 +220,25 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
       _phantom: PhantomData
     }
   }
+  
+  // The content of the vectors are not determined
+  // to be any validity, this is merely to convert
+  // to the buffers, so later can be reconstitued
+  // for a reuse of underlying buffers with from_buffers
+  pub fn into_buffers(self) -> (Vec<u8>, Vec<usize>) {
+    (self.buffer, self.commands_end_offsets)
+  }
+  
+  // Use the existing vector buffers, it is cleared
+  // before use. Mainly to reuse underlying buffer
+  // for efficiency
+  pub fn from_buffers(binder_dev: BorrowedFd<'binder>, raw: (Vec<u8>, Vec<usize>)) -> CommandBuffer<'binder, 'data> {
+    Self {
+      _phantom: PhantomData,
+      buffer: raw.0,
+      commands_end_offsets: raw.1,
+      binder_dev
+    }
+  }
 }
 
