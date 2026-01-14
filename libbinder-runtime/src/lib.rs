@@ -1,10 +1,12 @@
-use std::{os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Weak}};
+#![feature(box_as_ptr)]
+
+use std::{mem::ManuallyDrop, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Weak}};
 
 use libbinder::packet::builder::PacketBuilder as libbinder_PacketBuilder;
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal};
 use nix::libc;
 
-use crate::{object::Object, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap};
+use crate::{object::{BoxedObject, Object}, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap};
 
 pub mod object;
 pub mod packet;
@@ -16,8 +18,7 @@ pub(crate) struct Shared<Mgr: Object<Mgr>> {
   binder_dev: Arc<OwnedFd>,
   mgr: Arc<Mgr>,
   
-  // Manager is intentionally leaked
-  mgr_boxed: Option<*mut Arc<dyn Object<Mgr>>>,
+  mgr_local_ref: Option<ObjectRefLocal>,
   
   // Used by Binder to store incoming transaction and buffer :3
   // don't need to be used
@@ -29,7 +30,10 @@ unsafe impl<Mgr: Object<Mgr>> Send for Shared<Mgr> {}
 
 impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
   fn drop(&mut self) {
-    drop(unsafe { Box::from_raw(self.mgr_boxed.take().unwrap()) });
+    // Context manager not used anymore, drop it
+    unsafe {
+      ManuallyDrop::drop(&mut BoxedObject::<Mgr>::from_raw(self.mgr_local_ref.take().unwrap()));
+    }
   }
 }
 
@@ -63,10 +67,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     let ret = Self::new_impl(binder_dev, manager_provider);
     
     if let Ok(rt) = &ret {
-      let mgr_ref = ObjectRefLocal {
-        data: rt.____rt.mgr_boxed.clone().unwrap().addr(),
-        extra_data: 0
-      };
+      let mgr_ref = rt.____rt.mgr_local_ref.clone().unwrap();
       libbinder_raw::binder_set_context_mgr(rt.____rt.binder_dev.as_fd(), &mgr_ref).unwrap();
     }
     
@@ -101,7 +102,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
         let mgr = manager_provider(weak_rt);
         
         Shared {
-          mgr_boxed: Some(Box::leak(Box::new(mgr.clone() as Arc<dyn Object<Mgr>>)) as *mut _),
+          mgr_local_ref: Some(unsafe { BoxedObject::new(mgr.clone()).into_raw() }),
           mgr,
           _binder_mem: binder_mem,
           binder_dev
