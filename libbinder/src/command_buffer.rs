@@ -232,7 +232,10 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
   // Use the existing vector buffers, it is cleared
   // before use. Mainly to reuse underlying buffer
   // for efficiency
-  pub fn from_buffers(binder_dev: BorrowedFd<'binder>, raw: (Vec<u8>, Vec<usize>)) -> CommandBuffer<'binder, 'data> {
+  pub fn from_buffers(binder_dev: BorrowedFd<'binder>, mut raw: (Vec<u8>, Vec<usize>)) -> CommandBuffer<'binder, 'data> {
+    raw.0.clear();
+    raw.1.clear();
+    
     Self {
       _phantom: PhantomData,
       buffer: raw.0,
