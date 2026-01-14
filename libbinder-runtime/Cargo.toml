@@ -1,0 +1,11 @@
+[package]
+name = "libbinder-runtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libbinder = { version = "0.1.0", path = "../libbinder" }
+libbinder-raw = { version = "0.1.0", path = "../libbinder-raw" }
+nix = "0.30.1"
+thread_local = "1.1.9"
+yoke = "0.8.1"

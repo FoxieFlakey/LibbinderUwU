@@ -4,6 +4,7 @@ members = [
   "libbinder",
   "libbinder-raw",
   "binder-test",
-  "bytemuck-utils"
+  "bytemuck-utils",
+  "libbinder-runtime"
 ]
 

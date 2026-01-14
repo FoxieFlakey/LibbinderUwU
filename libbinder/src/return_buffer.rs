@@ -1,6 +1,7 @@
 use std::os::fd::BorrowedFd;
 
 use libbinder_raw::{commands::{PtrCookieRaw, ReturnVal}, object::reference::ObjectRefLocal, transaction::TransactionKernelManaged};
+use yoke::Yokeable;
 
 use crate::packet::Packet;
 
@@ -20,6 +21,7 @@ pub enum ReturnValue<'binder> {
   Noop
 }
 
+#[derive(Yokeable)]
 pub struct ReturnBuffer<'binder> {
   binder_dev: BorrowedFd<'binder>,
   pub(super) buffer: Vec<u8>,
