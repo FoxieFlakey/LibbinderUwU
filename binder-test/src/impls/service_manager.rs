@@ -2,7 +2,7 @@ use std::sync::{Condvar, LazyLock, Mutex};
 
 use libbinder_runtime::{ArcRuntime, WeakRuntime, object::{Object, TransactionError}, packet::{Packet, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}};
 
-use crate::{common::log, interface::{self, service_manager::{self, IServiceManager}}, process_sync::shared_completion::SharedCompletion};
+use crate::{common::log, interface::{self, IObject, service_manager::{self, IServiceManager}}, process_sync::shared_completion::SharedCompletion};
 
 static READY: LazyLock<SharedCompletion> = LazyLock::new(|| SharedCompletion::new());
 
@@ -48,6 +48,16 @@ impl ServiceManager {
   }
 }
 
+impl IObject for ServiceManager {
+  fn is_implemented(&self, interface_id: u64) -> Result<bool, TransactionError> {
+    if interface_id == service_manager::INTERFACE_ID {
+      Ok(true)
+    } else {
+      Ok(false)
+    }
+  }
+}
+
 impl IServiceManager for ServiceManager {
   fn print(&self, data: &str) -> Result<(), TransactionError> {
     log!("Service manager was requested to print: '{data}'");
@@ -86,6 +96,29 @@ impl Object<ServiceManager> for ServiceManager {
         
         let mut response = rt.new_packet();
         response.set_code(service_manager::PRINT_REPLY);
+        Ok(response.build())
+      }
+      
+      interface::IS_IMPLEMENTED => {
+        let Ok(arg1) = reader.read_u64() else {
+          let mut response = packet.get_runtime().new_packet();
+          response.set_code(interface::ERROR_REPLY);
+          
+          let mut writer = response.writer(DeadSimpleFormat::new());
+          writer.write_str("Malformed transaction");
+          drop(writer);
+          
+          let resp = response.build();
+          return Ok(resp);
+        };
+        
+        let mut response = rt.new_packet();
+        if self.is_implemented(arg1).unwrap() {
+          response.set_code(interface::IS_IMPLEMENTED_REPLY_YES);
+        } else {
+          response.set_code(interface::IS_IMPLEMENTED_REPLY_NO);
+        }
+        
         Ok(response.build())
       }
       

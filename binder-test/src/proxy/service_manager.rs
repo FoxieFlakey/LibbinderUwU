@@ -1,6 +1,6 @@
 use libbinder_runtime::{object::{FromProxy, Object, TransactionError}, packet::{Packet, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}, proxy::Proxy};
 
-use crate::interface::{self, service_manager::{self, IServiceManager}};
+use crate::interface::{self, IObject, service_manager::{self, IServiceManager}};
 
 pub struct IServiceManagerProxy {
   proxy: Proxy<IServiceManagerProxy>
@@ -8,11 +8,21 @@ pub struct IServiceManagerProxy {
 
 impl FromProxy<IServiceManagerProxy> for IServiceManagerProxy {
   fn from_proxy(proxy: Proxy<IServiceManagerProxy>) -> Result<Self, ()> {
-    Ok(Self { proxy })
+    if interface::is_implemented(&proxy, service_manager::INTERFACE_ID).map_err(|_| ())? {
+      Ok(Self { proxy })
+    } else {
+      Err(())
+    }
   }
 }
 
 // Potentially can be compile time generated!
+impl IObject for IServiceManagerProxy {
+  fn is_implemented(&self, interface_id: u64) -> Result<bool, TransactionError> {
+    interface::is_implemented(&self.proxy, interface_id)
+  }
+}
+
 impl IServiceManager for IServiceManagerProxy {
   fn print(&self, data: &str) -> Result<(), TransactionError> {
     let rt = self.proxy.get_runtime();

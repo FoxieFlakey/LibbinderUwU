@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use libbinder_runtime::{ArcRuntime, object::FromProxy};
 
-use crate::{impls::service_manager, interface::service_manager::IServiceManager, proxy::service_manager::IServiceManagerProxy};
+use crate::{common::log, impls::service_manager, interface::{self, service_manager::IServiceManager}, proxy::service_manager::IServiceManagerProxy};
 
 pub fn init() {
 }
@@ -14,6 +14,12 @@ pub fn main() {
   let runtime = ArcRuntime::new(binder_dev, |_, proxy| IServiceManagerProxy::from_proxy(proxy).unwrap())
     .unwrap();
   let manager = (runtime.get_manager().clone()) as Arc<dyn IServiceManager>;
+  
+  if manager.is_implemented(interface::service_manager::INTERFACE_ID).unwrap() {
+    log!("IServerManager is implemented by manager");
+  } else {
+    log!("IServerManager is not implemented by manager");
+  }
   
   manager.print("Hello World, sent from other process").unwrap();
   manager.print("Hello World, sent from other process").unwrap();

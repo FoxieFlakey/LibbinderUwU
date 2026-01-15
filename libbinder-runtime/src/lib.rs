@@ -20,9 +20,7 @@ mod context;
 
 pub(crate) struct Shared<Mgr: Object<Mgr>> {
   pub(crate) binder_dev: Arc<OwnedFd>,
-  mgr: Arc<Mgr>,
-  
-  mgr_local_ref: Option<ObjectRefLocal>,
+  mgr: RwLock<(Option<Arc<Mgr>>, Option<ObjectRefLocal>)>,
   
   // Used by Binder to store incoming transaction and buffer :3
   // don't need to be used
@@ -96,9 +94,10 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   pub fn new<F, B: Into<OwnedFd>>(binder_dev: B, manager_proxy_provider: F) -> Result<Self, ()>
     where F: FnOnce(WeakRuntime<Mgr>, Proxy<Mgr>) -> Mgr
   {
-    Self::new_impl(binder_dev, |weak_rt| {
-      manager_proxy_provider(weak_rt.clone(), Proxy::new(weak_rt, CONTEXT_MANAGER_REF))
-    }, false)
+    let rt = Self::new_impl(binder_dev)?;
+    let mgr = Arc::new(manager_proxy_provider(rt.downgrade(), Proxy::new(rt.downgrade(), CONTEXT_MANAGER_REF)));
+    *rt.____rt.mgr.write().unwrap() = (Some(mgr), None);
+    Ok(rt)
   }
   
   pub fn downgrade(&self) -> WeakRuntime<Mgr> {
@@ -110,19 +109,18 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   pub fn new_as_manager<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F) -> Result<Self, ()>
     where F: FnOnce(WeakRuntime<Mgr>) -> Mgr
   {
-    let ret = Self::new_impl(binder_dev, manager_provider, true);
+    let rt = Self::new_impl(binder_dev)?;
+    let mgr = Arc::new(manager_provider(rt.downgrade()));
+    let mgr_ref = object::into_local_ref(mgr.clone());
+    *rt.____rt.mgr.write().unwrap() = (Some(mgr), Some(mgr_ref));
+    rt.____rt.reference_states.lock().unwrap().insert(mgr_ref, (true, false));
     
-    if let Ok(rt) = &ret {
-      let mgr_ref = rt.____rt.mgr_local_ref.clone().unwrap();
-      libbinder_raw::binder_set_context_mgr(rt.____rt.binder_dev.as_fd(), &mgr_ref).unwrap();
-    }
+    libbinder_raw::binder_set_context_mgr(rt.____rt.binder_dev.as_fd(), &mgr_ref).unwrap();
     
-    ret
+    Ok(rt)
   }
   
-  fn new_impl<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F, is_manager: bool) -> Result<Self, ()>
-    where F: FnOnce(WeakRuntime<Mgr>) -> Mgr
-  {
+  fn new_impl<B: Into<OwnedFd>>(binder_dev: B) -> Result<Self, ()> {
     let binder_dev = Arc::new(binder_dev.into());
     let binder_mem = {
       let len = 8 * 1024 * 1024;
@@ -145,28 +143,20 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     let ret  = ArcRuntime {
       ____rt: Arc::new_cyclic(|weak| {
         let weak_rt = WeakRuntime { ____rt: weak.clone() };
-        let mgr = Arc::new(manager_provider(weak_rt.clone()));
         let binder_dev2 = binder_dev.clone();
         
         let (ro, wr) = nix::unistd::pipe().unwrap();
         
         let ro = Arc::new(ro);
         let ro2 = ro.clone();
-        let mgr_ref = object::into_local_ref(mgr.clone());
-        let mut ref_states = HashMap::new();
-        
-        if is_manager {
-          ref_states.insert(mgr_ref, (true, false));
-        }
         
         Shared {
-          mgr_local_ref: Some(mgr_ref),
-          mgr,
+          mgr: RwLock::new((None, None)),
           _binder_mem: binder_mem,
           worker: Mutex::new(Some(thread::spawn(move || {
             worker(binder_dev2, weak_rt, ro2)
           }))),
-          reference_states: Mutex::new(ref_states),
+          reference_states: Mutex::new(HashMap::new()),
           remote_reference_counters: RwLock::new(HashMap::new()),
           shutdown_pipe_wr: wr,
           _shutdown_pipe_ro: ro,
@@ -178,8 +168,8 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     Ok(ret)
   }
   
-  pub fn get_manager(&self) -> &Arc<Mgr> {
-    &self.____rt.mgr
+  pub fn get_manager(&self) -> Arc<Mgr> {
+    self.____rt.mgr.read().unwrap().0.clone().unwrap()
   }
   
   pub fn ptr_eq(&self, other: &Self) -> bool {
