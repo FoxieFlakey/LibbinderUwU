@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::RefCell, mem, os::fd::BorrowedFd};
+use std::{borrow::Cow, cell::RefCell, mem::{self, ManuallyDrop}, os::fd::BorrowedFd};
 
 use libbinder::{command_buffer::{Command, CommandBuffer}, packet::Packet as libbinder_Packet, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::types::reference::ObjectRefLocal;
@@ -62,12 +62,20 @@ impl Context {
             obj.on_bc_increfs();
           },
           ReturnValue::Release(local_ref) => {
-            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
+            let mut obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
             obj.on_bc_release();
+            
+            if obj.is_dead() {
+              unsafe { ManuallyDrop::drop(&mut obj) };
+            }
           },
           ReturnValue::ReleaseWeak(local_ref) => {
-            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
+            let mut obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
             obj.on_bc_decrefs();
+            
+            if obj.is_dead() {
+              unsafe { ManuallyDrop::drop(&mut obj) };
+            }
           },
           ReturnValue::Reply(_) => if is_initial { ret_handle_func(&ret) },
           ReturnValue::TransactionFailed => if is_initial { ret_handle_func(&ret) },

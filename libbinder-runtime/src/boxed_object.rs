@@ -94,6 +94,10 @@ impl<Mgr: Object<Mgr>> BoxedObject<Mgr> {
     }).unwrap();
   }
   
+  pub fn is_dead(&self) -> bool {
+    self.inner.ref_tracker.load(Ordering::Relaxed) & REF_DEAD_BIT != 0
+  }
+  
   // Dropping Self would decrease the Arc counter on the
   // object, to avoid mistake it is wrapped inside ManuallyDrop
   #[must_use = "this has very intricate behaviour, please check"]
