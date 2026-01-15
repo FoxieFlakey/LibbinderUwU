@@ -42,6 +42,12 @@ fn main() {
         weak_rt: WeakRuntime<ContextManager>
       }
       
+      impl Drop for ContextManager {
+        fn drop(&mut self) {
+          println!("Ctx manager dropped");
+        }
+      }
+      
       impl Object<ContextManager> for ContextManager {
         fn do_transaction<'packet, 'runtime>(&self, packet: &'packet libbinder_runtime::packet::Packet<'runtime, ContextManager>) -> Result<libbinder_runtime::packet::Packet<'runtime, ContextManager>, libbinder_runtime::object::TransactionError> {
           let rt = packet.get_runtime();

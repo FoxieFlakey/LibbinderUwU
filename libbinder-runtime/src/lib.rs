@@ -52,8 +52,10 @@ impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
       }
     }
     
-    // Context manager not used anymore, drop it
-    unsafe { object::from_local_ref::<Mgr>(self.mgr_local_ref.take().unwrap()) };
+    for (&local_ref, _) in self.reference_states.get_mut().unwrap().iter() {
+      // Remove all currently exist references
+      drop(unsafe { object::from_local_ref::<Mgr>(local_ref) });
+    }
   }
 }
 
