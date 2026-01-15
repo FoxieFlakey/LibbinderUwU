@@ -125,6 +125,7 @@ impl<'binder> TransactionKernelManaged<'binder> {
         target: if is_reply {
             ObjectRef::Remote(ObjectRefRemote {
               data_handle: unsafe { raw.target.handle },
+              extra_local_data: raw.extra_data
             })
           } else {
             ObjectRef::Local(ObjectRefLocal {

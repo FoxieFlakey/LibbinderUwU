@@ -59,6 +59,7 @@ impl ObjectRef {
       object::Type::RemoteReference => Ok(ObjectRef::Remote(ObjectRefRemote {
         // SAFETY: It is handle type :3
         data_handle: unsafe { raw.binder_or_handle.handle },
+        extra_local_data: raw.extra_data
       })),
       
       _ => panic!("ObjectRef only need to handle BINDER and HANDLE nothing else")
@@ -85,10 +86,11 @@ pub struct ObjectRefLocal {
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ObjectRefRemote {
-  pub data_handle: u32
+  pub data_handle: u32,
+  pub extra_local_data: usize
 }
 
-pub const CONTEXT_MANAGER_REF: ObjectRefRemote = ObjectRefRemote { data_handle: 0 };
+pub const CONTEXT_MANAGER_REF: ObjectRefRemote = ObjectRefRemote { data_handle: 0, extra_local_data: 0 };
 
 impl ObjectRefLocal {
   pub(crate) fn into_raw(&self) -> ObjectRefRaw {

@@ -61,7 +61,7 @@ impl<'binder> PacketBuilder<'binder> {
         data: TransactionDataCommon {
           code: self.code.take().expect("code must be given to build a packet"),
           flags: self.flags.take().unwrap_or(BitFlags::empty()),
-          target: ObjectRef::Remote(ObjectRefRemote { data_handle: 0 }),
+          target: ObjectRef::Remote(ObjectRefRemote { data_handle: 0, extra_local_data: 0 }),
           data_slice: unsafe { slice::from_raw_parts(self.data_buffer.as_ptr(), self.data_buffer.len()) },
           offsets: unsafe { slice::from_raw_parts(self.offsets_buffer.as_ptr(), self.offsets_buffer.len()) }
         }
