@@ -1,9 +1,9 @@
-use std::{borrow::Cow, mem::ManuallyDrop};
+use std::{borrow::Cow, mem::ManuallyDrop, sync::Arc};
 
 use libbinder::{command_buffer::Command, return_buffer::ReturnValue};
 use libbinder_raw::types::reference::{ObjectRef, ObjectRefRemote};
 
-use crate::{WeakRuntime, boxed_object::BoxedObject, context::Context, object::{Object, TransactionError}, packet::Packet};
+use crate::{WeakRuntime, context::Context, object::{self, Object, TransactionError}, packet::Packet};
 
 pub struct Proxy<Mgr: Object<Mgr>> {
   runtime: WeakRuntime<Mgr>,
@@ -37,10 +37,14 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
     for (_, reference) in packet.iter_references() {
       match reference {
         ObjectRef::Local(local) => {
-          let obj = unsafe { ManuallyDrop::into_inner(BoxedObject::<Mgr>::from_raw(local)) };
-          obj.done_constructing();
-          rt.____rt.local_objects_sent_outside.write().unwrap()
-            .insert(local, obj);
+          let obj = ManuallyDrop::new(unsafe { object::from_local_ref::<Mgr>(local) });
+          unsafe { Arc::increment_strong_count(Arc::as_ptr(&obj)) };
+          
+          rt.____rt.reference_states.lock()
+            .unwrap()
+            .entry(local)
+            .or_insert((true, false))
+            .0 = true;
         },
         ObjectRef::Remote(_) => ()
       }

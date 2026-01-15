@@ -1,13 +1,13 @@
-#![feature(box_as_ptr)]
+#![feature(ptr_metadata)]
 
-use std::{collections::HashMap, mem::ManuallyDrop, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, RwLock, Weak}, thread::{self, JoinHandle}};
+use std::{collections::HashMap, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, Weak}, thread::{self, JoinHandle}};
 
 use libbinder::packet::builder::PacketBuilder as libbinder_PacketBuilder;
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal};
 use nix::libc;
 use thread_local::ThreadLocal;
 
-use crate::{object::Object, boxed_object::BoxedObject, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap, worker::worker};
+use crate::{object::Object, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap, worker::worker};
 
 pub mod object;
 pub mod packet;
@@ -15,7 +15,6 @@ pub mod proxy;
 
 mod util;
 mod worker;
-mod boxed_object;
 mod context;
 
 pub(crate) struct Shared<Mgr: Object<Mgr>> {
@@ -31,7 +30,10 @@ pub(crate) struct Shared<Mgr: Object<Mgr>> {
   _shutdown_pipe_ro: Arc<OwnedFd>,
   worker: Mutex<Option<JoinHandle<()>>>,
   
-  local_objects_sent_outside: RwLock<HashMap<ObjectRefLocal, BoxedObject<Mgr>>>,
+  // .0 is there any strong reference from outside
+  // .1 is there any weak reference from outside
+  // .0 and .1 will never be false at same time
+  reference_states: Mutex<HashMap<ObjectRefLocal, (bool, bool)>>,
   
   exec_context: ThreadLocal<context::Context>
 }
@@ -51,9 +53,7 @@ impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
     }
     
     // Context manager not used anymore, drop it
-    unsafe {
-      ManuallyDrop::drop(&mut BoxedObject::<Mgr>::from_raw(self.mgr_local_ref.take().unwrap()));
-    }
+    unsafe { object::from_local_ref::<Mgr>(self.mgr_local_ref.take().unwrap()) };
   }
 }
 
@@ -133,17 +133,18 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
         
         let ro = Arc::new(ro);
         let ro2 = ro.clone();
-        let obj = BoxedObject::new(mgr.clone());
-        obj.done_constructing();
+        let mgr_ref = object::into_local_ref(mgr.clone());
+        let mut ref_states = HashMap::new();
+        ref_states.insert(mgr_ref, (true, false));
         
         Shared {
-          mgr_local_ref: Some(unsafe { obj.into_raw() }),
+          mgr_local_ref: Some(mgr_ref),
           mgr,
           _binder_mem: binder_mem,
           worker: Mutex::new(Some(thread::spawn(move || {
             worker(binder_dev2, weak_rt, ro2)
           }))),
-          local_objects_sent_outside: RwLock::new(HashMap::new()),
+          reference_states: Mutex::new(ref_states),
           shutdown_pipe_wr: wr,
           _shutdown_pipe_ro: ro,
           exec_context: ThreadLocal::new(),

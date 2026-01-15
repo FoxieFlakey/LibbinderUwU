@@ -1,9 +1,9 @@
-use std::{borrow::Cow, cell::RefCell, mem::{self, ManuallyDrop}, os::fd::BorrowedFd};
+use std::{borrow::Cow, cell::RefCell, mem::{self, ManuallyDrop}, os::fd::BorrowedFd, sync::Arc};
 
 use libbinder::{command_buffer::{Command, CommandBuffer}, packet::Packet as libbinder_Packet, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::types::reference::ObjectRefLocal;
 
-use crate::{ArcRuntime, object::Object, boxed_object::BoxedObject, packet::Packet};
+use crate::{ArcRuntime, object::{self, Object}, packet::Packet};
 
 struct Session {
   ret_buf: (Vec<ReturnValue<'static>>, Vec<u8>),
@@ -53,38 +53,64 @@ impl Context {
           ReturnValue::Transaction(transaction) => {
             queued_transactions.push((transaction.0.clone(), transaction.1.clone()));
           },
-          ReturnValue::Acquire(local_ref) => {
-            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
-            obj.on_bc_acquire();
-          },
-          ReturnValue::AcquireWeak(local_ref) => {
-            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
-            obj.on_bc_increfs();
-          },
-          ReturnValue::Release(local_ref) => {
-            let mut obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
-            obj.on_bc_release();
-            
-            if obj.is_dead() {
-              // Remove from live object map
-              let mut map = runtime.____rt.local_objects_sent_outside.write().unwrap();
-              map.remove(local_ref)
-                .expect("Local object was not in the live objects map, for some reason");
-              unsafe { ManuallyDrop::drop(&mut obj) };
-            }
-          },
+          ReturnValue::Acquire(local_ref) |
+          ReturnValue::Release(local_ref) |
+          ReturnValue::AcquireWeak(local_ref) |
           ReturnValue::ReleaseWeak(local_ref) => {
-            let mut obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
-            obj.on_bc_decrefs();
+            let obj = unsafe { ManuallyDrop::new(object::from_local_ref::<Mgr>(local_ref.clone())) };
+            let mut ref_states = runtime.____rt.reference_states.lock().unwrap();
+            let ref_state = ref_states.get_mut(local_ref).expect("Unknown local object");
+            let kill_object ;
             
-            if obj.is_dead() {
-              // Remove from live object map
-              let mut map = runtime.____rt.local_objects_sent_outside.write().unwrap();
-              map.remove(local_ref)
-                .expect("Local object was not in the live objects map, for some reason");
-              unsafe { ManuallyDrop::drop(&mut obj) };
+            match ret {
+              ReturnValue::Acquire(_) => {
+                if ref_state.0 != false {
+                  panic!("Kernel sent BC_ACQUIRE when object's strong ref count is nonzero");
+                }
+                ref_state.0 = true;
+                kill_object = false;
+              },
+              ReturnValue::Release(_) => {
+                if ref_state.0 != false {
+                  panic!("Kernel sent BC_RELEASE when object's strong ref count is zero");
+                }
+                ref_state.0 = false;
+                
+                if ref_state.0 == false && ref_state.1 == false {
+                  // Object is dead to outside, lets kill them
+                  kill_object = true;
+                } else {
+                  kill_object = false;
+                }
+              },
+              ReturnValue::AcquireWeak(_) => {
+                if ref_state.1 != false {
+                  panic!("Kernel sent BC_INCREFS when object's weak ref count is nonzero");
+                }
+                ref_state.1 = true;
+                kill_object = false;
+              },
+              ReturnValue::ReleaseWeak(_) => {
+                if ref_state.1 != false {
+                  panic!("Kernel sent BC_DECREFS when object's weak ref count is zero");
+                }
+                ref_state.1 = false;
+                
+                if ref_state.0 == false && ref_state.1 == false {
+                  // Object is dead to outside lets decrement
+                  kill_object = true;
+                } else {
+                  kill_object = false;
+                }
+              },
+              _ => unreachable!()
             }
-          },
+            
+            if kill_object {
+              ref_states.remove(local_ref).unwrap();
+              unsafe { Arc::decrement_strong_count(Arc::as_ptr(&obj)) };
+            }
+          }
           ReturnValue::Reply(_) => if is_initial { ret_handle_func(&ret) },
           ReturnValue::TransactionFailed => if is_initial { ret_handle_func(&ret) },
           ReturnValue::Ok => if is_initial { ret_handle_func(&ret) },
@@ -117,9 +143,9 @@ impl Context {
         
         // Process queue transactions after processing all return values
         for (obj, packet) in queued_transactions.drain(..) {
-          let obj = unsafe { BoxedObject::<Mgr>::from_raw(obj.clone()) };
+          let obj = ManuallyDrop::new(unsafe { object::from_local_ref(obj.clone()) });
           let packet = Packet { runtime: runtime, packet };
-          let reply = obj.get_object().do_transaction(&packet).unwrap();
+          let reply = obj.do_transaction(&packet).unwrap();
           
           let mut cmd_buf = CommandBuffer::new(runtime.get_binder());
           
