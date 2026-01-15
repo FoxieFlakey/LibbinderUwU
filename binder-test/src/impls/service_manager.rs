@@ -39,11 +39,11 @@ pub fn main() {
 }
 
 impl ServiceManager {
-  pub fn new(runtime: WeakRuntime<Self>) -> Self {
+  pub fn new(runtime: ArcRuntime<Self>) -> Self {
     Self {
       stop_requested: Mutex::new(false),
       stop_wakeup: Condvar::new(),
-      runtime
+      runtime: runtime.downgrade()
     }
   }
 }

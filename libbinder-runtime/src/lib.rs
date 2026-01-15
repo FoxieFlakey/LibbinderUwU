@@ -92,10 +92,10 @@ pub fn new_proxy_manager<B: Into<OwnedFd>>(binder_dev: B) -> Result<ArcRuntime<S
 
 impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   pub fn new<F, B: Into<OwnedFd>>(binder_dev: B, manager_proxy_provider: F) -> Result<Self, ()>
-    where F: FnOnce(WeakRuntime<Mgr>, Proxy<Mgr>) -> Mgr
+    where F: FnOnce(ArcRuntime<Mgr>, Proxy<Mgr>) -> Mgr
   {
     let rt = Self::new_impl(binder_dev)?;
-    let mgr = Arc::new(manager_proxy_provider(rt.downgrade(), Proxy::new(rt.downgrade(), CONTEXT_MANAGER_REF)));
+    let mgr = Arc::new(manager_proxy_provider(rt.clone(), Proxy::new(rt.downgrade(), CONTEXT_MANAGER_REF)));
     *rt.____rt.mgr.write().unwrap() = (Some(mgr), None);
     Ok(rt)
   }
@@ -107,10 +107,10 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   }
   
   pub fn new_as_manager<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F) -> Result<Self, ()>
-    where F: FnOnce(WeakRuntime<Mgr>) -> Mgr
+    where F: FnOnce(ArcRuntime<Mgr>) -> Mgr
   {
     let rt = Self::new_impl(binder_dev)?;
-    let mgr = Arc::new(manager_provider(rt.downgrade()));
+    let mgr = Arc::new(manager_provider(rt.clone()));
     let mgr_ref = object::into_local_ref(mgr.clone());
     *rt.____rt.mgr.write().unwrap() = (Some(mgr), Some(mgr_ref));
     rt.____rt.reference_states.lock().unwrap().insert(mgr_ref, (true, false));
