@@ -1,9 +1,10 @@
-use std::ffi::CStr;
+use std::{ffi::CStr, sync::{Arc, atomic::Ordering}};
 
 use delegate::delegate;
 use libbinder::formats::{ReadFormat, SliceReadResult};
+use libbinder_raw::types::reference::ObjectRef;
 
-use crate::{ArcRuntime, object::Object};
+use crate::{ArcRuntime, object::{self, FromProxy, Object}, proxy::Proxy, reference::{LocalObject, Reference, RemoteObject}};
 
 pub struct Reader<'packet, 'runtime: 'packet, Format: ReadFormat<'packet>, Mgr: Object<Mgr>> {
   pub(super) runtime: &'runtime ArcRuntime<Mgr>,
@@ -13,6 +14,48 @@ pub struct Reader<'packet, 'runtime: 'packet, Format: ReadFormat<'packet>, Mgr: 
 impl<'packet, 'runtime: 'packet, Format: ReadFormat<'packet>, Mgr: Object<Mgr>> Reader<'packet, 'runtime, Format, Mgr> {
   pub fn get_runtime(&self) -> &'runtime ArcRuntime<Mgr> {
     self.runtime
+  }
+  
+  pub fn read_reference<T: FromProxy<Mgr>>(&mut self) -> Result<Reference<Mgr, T>, ()> {
+    let mut concrete = None;
+    self.reader.read_reference(|object_ref| {
+      match object_ref {
+        ObjectRef::Remote(remote_ref) => {
+          let proxy = Proxy::new(self.runtime.downgrade(), remote_ref.clone());
+          if let Ok(x) = T::from_proxy(proxy) {
+            concrete = Some(Reference::Remote(Arc::new(RemoteObject {
+              runtime: self.runtime.clone(),
+              inner: *remote_ref,
+              typed: Arc::new(x)
+            })));
+            
+            // Increment reference ot the remote_ref
+            self.runtime.____rt.remote_reference_counters.read()
+              .unwrap()
+              .get(remote_ref)
+              .unwrap()
+              .fetch_add(1, Ordering::Relaxed);
+          }
+        }
+        
+        ObjectRef::Local(local_ref) => {
+          let obj = unsafe { object::from_local_ref::<Mgr>(local_ref.clone()) };
+          unsafe { Arc::increment_strong_count(Arc::as_ptr(&obj)); };
+          
+          if let Ok(x) = Arc::downcast(obj) {
+            concrete = Some(Reference::Local(Arc::new(LocalObject {
+              inner: *local_ref,
+              runtime: self.runtime.clone(),
+              typed: x
+            })));
+          }
+        }
+      };
+      
+      concrete.is_some()
+    })?;
+    
+    Ok(concrete.unwrap())
   }
   
   delegate!(

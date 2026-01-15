@@ -188,7 +188,7 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
   
   forward!(read_bool_slice, &'packet [bool]);
   
-  pub fn read_reference(&mut self) -> Result<ObjectRef, ()> {
+  pub fn read_reference<F: FnOnce(&ObjectRef) -> bool>(&mut self, checker: F) -> Result<ObjectRef, ()> {
     let peek_offset = self.format.get_reader().get_current_offset();
     assert!(peek_offset.is_multiple_of(Type::alignment_in_buffer_needed()), "improper read alignment for object reference");
     
@@ -198,6 +198,11 @@ impl<'packet, 'binder, Format: ReadFormat<'packet>> Reader<'packet, 'binder, For
         let type_size = ref_obj.type_size_with_header();
         let bytes = self.format.get_reader().peek(type_size, peek_offset)?;
         let result = ObjectRef::try_from_bytes(bytes)?;
+        
+        if !checker(&result) {
+          // Outside checker say is failed return error
+          return Err(());
+        }
         
         // The data was successfully read, lets just advance the reader state
         self.format.get_reader_mut().read(type_size + peek_offset).unwrap();

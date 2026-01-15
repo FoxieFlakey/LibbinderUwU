@@ -3,7 +3,7 @@ use std::{borrow::Cow, mem::ManuallyDrop, sync::{Arc, atomic::{AtomicU64, Orderi
 use libbinder::{command_buffer::{Command, CommandBuffer}, return_buffer::ReturnValue};
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRef, ObjectRefRemote};
 
-use crate::{WeakRuntime, context::Context, object::{self, Object, TransactionError}, packet::Packet};
+use crate::{WeakRuntime, context::Context, object::{self, FromProxy, Object, TransactionError}, packet::Packet};
 
 pub struct Proxy<Mgr: Object<Mgr>> {
   runtime: WeakRuntime<Mgr>,
@@ -145,7 +145,19 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
   }
 }
 
+impl<Mgr: Object<Mgr>> FromProxy<Mgr> for Proxy<Mgr> {
+  fn from_proxy(proxy: Proxy<Mgr>) -> Result<Self, ()> {
+    Ok(proxy)
+  }
+}
+
 pub struct SelfMananger(pub Proxy<SelfMananger>);
+
+impl FromProxy<SelfMananger> for SelfMananger {
+  fn from_proxy(proxy: Proxy<SelfMananger>) -> Result<Self, ()> {
+    Ok(SelfMananger(proxy))
+  }
+}
 
 impl Object<SelfMananger> for SelfMananger {
   fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, TransactionError> {

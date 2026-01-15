@@ -12,6 +12,7 @@ use crate::{object::Object, packet::builder::PacketBuilder, proxy::{Proxy, SelfM
 pub mod object;
 pub mod packet;
 pub mod proxy;
+pub mod reference;
 
 mod util;
 mod worker;
@@ -179,6 +180,10 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   
   pub fn get_manager(&self) -> &Arc<Mgr> {
     &self.____rt.mgr
+  }
+  
+  pub fn ptr_eq(&self, other: &Self) -> bool {
+    Arc::ptr_eq(&self.____rt, &other.____rt)
   }
   
   pub fn new_packet<'runtime>(&'runtime self) -> PacketBuilder<'runtime, Mgr> {

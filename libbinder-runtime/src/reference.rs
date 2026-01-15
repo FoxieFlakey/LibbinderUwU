@@ -1,27 +1,27 @@
 use std::sync::Arc;
 
-use libbinder_raw::types::reference::ObjectRefRemote;
+use libbinder_raw::types::reference::{ObjectRef, ObjectRefLocal, ObjectRefRemote};
 
-use crate::{ArcRuntime, boxed_object::BoxedObject, object::Object};
+use crate::{ArcRuntime, object::Object};
 
-pub struct LocalObject<Mgr: Object<Mgr>, T: Object<Mgr>> {
+pub struct LocalObject<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> {
   pub(crate) runtime: ArcRuntime<Mgr>,
-  pub(crate) inner: BoxedObject<Mgr>,
-  typed: Arc<T>
+  pub(crate) inner: ObjectRefLocal,
+  pub(crate) typed: Arc<T>
 }
 
-pub struct RemoteObject<Mgr: Object<Mgr>, T: Object<Mgr>> {
+pub struct RemoteObject<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> {
   pub(crate) runtime: ArcRuntime<Mgr>,
   pub(crate) inner: ObjectRefRemote,
-  typed: Arc<T>
+  pub(crate) typed: Arc<T>
 }
 
-pub enum Reference<Mgr: Object<Mgr>, T: Object<Mgr>> {
+pub enum Reference<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> {
   Local(Arc<LocalObject<Mgr, T>>),
   Remote(Arc<RemoteObject<Mgr, T>>)
 }
 
-impl<Mgr: Object<Mgr>, T: Object<Mgr>> Clone for Reference<Mgr, T> {
+impl<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> Clone for Reference<Mgr, T> {
   fn clone(&self) -> Self {
     match self {
       Reference::Local(x) => Self::Local(x.clone()),
@@ -30,11 +30,30 @@ impl<Mgr: Object<Mgr>, T: Object<Mgr>> Clone for Reference<Mgr, T> {
   }
 }
 
-impl<Mgr: Object<Mgr>, T: Object<Mgr>> Reference<Mgr, T> {
+
+impl<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> Reference<Mgr, T> {
   pub fn get(&self) -> &Arc<T> {
     match self {
       Reference::Local(x) => &x.typed,
       Reference::Remote(x) => &x.typed
+    }
+  }
+  
+  pub(crate) fn get_runtime(this: &Self) -> &ArcRuntime<Mgr> {
+    match this {
+      Reference::Local(x) => &x.runtime,
+      Reference::Remote(x) => &x.runtime
+    }
+  }
+  
+  pub(crate) fn get_obj_ref(this: &Self) -> ObjectRef {
+    match this {
+      Reference::Local(x) => {
+        ObjectRef::Local(x.inner.clone())
+      },
+      Reference::Remote(x) => {
+        ObjectRef::Remote(x.inner.clone())
+      }
     }
   }
 }

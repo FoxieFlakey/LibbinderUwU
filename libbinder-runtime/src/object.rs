@@ -2,7 +2,7 @@ use std::{any::Any, error::Error, mem, ptr::{self, DynMetadata}, sync::Arc};
 
 use libbinder_raw::types::reference::ObjectRefLocal;
 
-use crate::packet::Packet;
+use crate::{packet::Packet, proxy::Proxy};
 
 #[derive(Debug)]
 pub enum TransactionError {
@@ -27,6 +27,10 @@ pub enum TransactionError {
 // sent outside
 pub trait Object<Mgr: Object<Mgr>>: Sync + Send + Any + 'static {
   fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError>;
+}
+
+pub trait FromProxy<Mgr: Object<Mgr>>: Object<Mgr> + Sized {
+  fn from_proxy(proxy: Proxy<Mgr>) -> Result<Self, ()>;
 }
 
 // Does not touch the reference counter
