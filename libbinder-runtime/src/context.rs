@@ -53,10 +53,22 @@ impl Context {
           ReturnValue::Transaction(transaction) => {
             queued_transactions.push((transaction.0.clone(), transaction.1.clone()));
           },
-          ReturnValue::Acquire(_) => todo!(),
-          ReturnValue::AcquireWeak(_) => todo!(),
-          ReturnValue::Release(_) => todo!(),
-          ReturnValue::ReleaseWeak(_) => todo!(),
+          ReturnValue::Acquire(local_ref) => {
+            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
+            obj.on_bc_acquire();
+          },
+          ReturnValue::AcquireWeak(local_ref) => {
+            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
+            obj.on_bc_increfs();
+          },
+          ReturnValue::Release(local_ref) => {
+            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
+            obj.on_bc_release();
+          },
+          ReturnValue::ReleaseWeak(local_ref) => {
+            let obj = unsafe { BoxedObject::<Mgr>::from_raw(local_ref.clone()) };
+            obj.on_bc_decrefs();
+          },
           ReturnValue::Reply(_) => if is_initial { ret_handle_func(&ret) },
           ReturnValue::TransactionFailed => if is_initial { ret_handle_func(&ret) },
           ReturnValue::Ok => if is_initial { ret_handle_func(&ret) },
