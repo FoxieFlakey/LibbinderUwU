@@ -1,6 +1,6 @@
 #![feature(ptr_metadata)]
 
-use std::{collections::HashMap, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, RwLock, Weak, atomic::AtomicU64}, thread::{self, JoinHandle}};
+use std::{collections::HashMap, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, RwLock, Weak, atomic::{AtomicBool, AtomicU64, Ordering}}, thread::{self, JoinHandle}};
 
 use libbinder::command_buffer::{Command, CommandBuffer};
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal, ObjectRefRemote};
@@ -28,6 +28,7 @@ pub(crate) struct Shared<Mgr: Object<Mgr>> {
   shutdown_pipe_wr: OwnedFd,
   _shutdown_pipe_ro: Arc<OwnedFd>,
   worker: Mutex<Option<JoinHandle<()>>>,
+  is_looper_stopped: AtomicBool,
   
   // .0 is there any strong reference from outside
   // .1 is there any weak reference from outside
@@ -44,8 +45,8 @@ pub(crate) struct Shared<Mgr: Object<Mgr>> {
 unsafe impl<Mgr: Object<Mgr>> Sync for Shared<Mgr> {}
 unsafe impl<Mgr: Object<Mgr>> Send for Shared<Mgr> {}
 
-impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
-  fn drop(&mut self) {
+impl<Mgr: Object<Mgr>> Shared<Mgr> {
+  fn stop_looper(&self) {
     let handle = self.worker.lock().unwrap().take();
     if let Some(thrd) = handle {
       nix::unistd::write(self.shutdown_pipe_wr.as_fd(), "UwU".as_bytes()).unwrap();
@@ -54,6 +55,12 @@ impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
         thrd.join().unwrap();
       }
     }
+  }
+}
+
+impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
+  fn drop(&mut self) {
+    self.stop_looper();
     
     for (&local_ref, _) in self.reference_states.get_mut().unwrap().iter() {
       // Remove all currently exist references
@@ -153,6 +160,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
         Shared {
           mgr: RwLock::new((None, None)),
           _binder_mem: binder_mem,
+          is_looper_stopped: AtomicBool::new(false),
           worker: Mutex::new(Some(thread::spawn(move || {
             worker(binder_dev2, weak_rt, ro2)
           }))),
@@ -182,6 +190,14 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   
   pub fn get_binder<'runtime>(&'runtime self) -> BorrowedFd<'runtime> {
     self.____rt.binder_dev.as_fd()
+  }
+  
+  pub fn stop_background_threads(&self) {
+    if self.____rt.is_looper_stopped.swap(true, Ordering::Relaxed) {
+      panic!("Looper already stopped");
+    }
+    
+    self.____rt.stop_looper();
   }
 }
 

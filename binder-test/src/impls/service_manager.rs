@@ -36,6 +36,8 @@ pub fn main() {
   while *guard == false {
     guard = manager.stop_wakeup.wait(guard).unwrap();
   }
+  
+  rt.stop_background_threads();
 }
 
 impl ServiceManager {
