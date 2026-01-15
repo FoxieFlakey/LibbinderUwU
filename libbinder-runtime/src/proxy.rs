@@ -39,9 +39,8 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
         ObjectRef::Local(local) => {
           let obj = unsafe { ManuallyDrop::into_inner(BoxedObject::<Mgr>::from_raw(local)) };
           obj.done_constructing();
-          let ret = rt.____rt.local_objects_sent_outside.write().unwrap()
+          rt.____rt.local_objects_sent_outside.write().unwrap()
             .insert(local, obj);
-          assert!(ret.is_none(), "object musn't already in registry");
         },
         ObjectRef::Remote(_) => ()
       }
