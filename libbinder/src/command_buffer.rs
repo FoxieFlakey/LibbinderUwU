@@ -165,8 +165,12 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
       
       match binder_read_write(self.binder_dev, write_buf, read_buf) {
         Ok(x) => {
-          (bytes_written, bytes_read) = x;
-          break;
+          if x.0 + offset == self.buffer.len() {
+            (bytes_written, bytes_read) = x;
+            break;
+          }
+          
+          // Maybe not all is written for some reason
         }
         Err((Errno::EINTR, (bytes_written, bytes_read))) => {
           write_buf = &write_buf[bytes_written..];
