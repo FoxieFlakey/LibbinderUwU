@@ -25,9 +25,12 @@ pub mod service_manager {
   pub const PRINT: u32 = 0x101;
   pub const PRINT_REPLY: u32 = 0x100;
   
+  // One way version of above method
+  pub const ONEWAY_PRINT: u32 = 0x102;
+  
   pub trait IServiceManager: IObject {
     fn print(&self, data: &str) -> Result<(), TransactionError>;
-    fn oneway_print(&self, data: &str) -> Result<(), TransactionError>;
+    /* oneway */ fn oneway_print(&self, data: &str) -> Result<(), TransactionError>;
     fn stop(&self) -> Result<(), TransactionError>;
   }
 }

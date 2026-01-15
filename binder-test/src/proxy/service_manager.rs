@@ -54,7 +54,7 @@ impl IServiceManager for IServiceManagerProxy {
     let mut packet = rt.new_packet();
     
     // This one was intentionally made calling to non oneway print, to test logics
-    packet.set_code(service_manager::PRINT);
+    packet.set_code(service_manager::ONEWAY_PRINT);
     packet.set_flags(TransactionFlag::OneWay.into());
     packet.writer(DeadSimpleFormat::new())
       .write_str(data);

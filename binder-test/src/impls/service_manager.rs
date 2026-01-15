@@ -67,7 +67,8 @@ impl IServiceManager for ServiceManager {
   }
   
   fn oneway_print(&self, data: &str) -> Result<(), TransactionError> {
-    self.print(data)
+    log!("[OneWay call] Service manager was requested to print: '{data}'");
+    Ok(())
   }
   
   fn stop(&self) -> Result<(), TransactionError> {
@@ -111,6 +112,35 @@ impl Object<ServiceManager> for ServiceManager {
         Ok(Some(response.build()))
       }
       
+      service_manager::ONEWAY_PRINT => {
+        if !is_oneway {
+          let mut response = packet.get_runtime().new_packet();
+          response.set_code(interface::ERROR_REPLY);
+          
+          let mut writer = response.writer(DeadSimpleFormat::new());
+          writer.write_str("Unexpected synchronous/non-oneway transaction");
+          drop(writer);
+          
+          let resp = response.build();
+          return Ok(Some(resp));
+        }
+        
+        let Ok(arg1) = reader.read_str() else {
+          let mut response = packet.get_runtime().new_packet();
+          response.set_code(interface::ERROR_REPLY);
+          
+          let mut writer = response.writer(DeadSimpleFormat::new());
+          writer.write_str("Malformed transaction");
+          drop(writer);
+          
+          let resp = response.build();
+          return Ok(Some(resp));
+        };
+        
+        self.oneway_print(arg1).unwrap();
+        Ok(None)
+      }
+      
       interface::IS_IMPLEMENTED => {
         if is_oneway {
           log!("Received is_implemented transaction but it was oneway, ignoring");
@@ -145,7 +175,7 @@ impl Object<ServiceManager> for ServiceManager {
           response.set_code(interface::ERROR_REPLY);
           
           let mut writer = response.writer(DeadSimpleFormat::new());
-          writer.write_str("Malformed transaction");
+          writer.write_str("Unexpected synchronous/non-oneway transaction");
           drop(writer);
           
           let resp = response.build();
