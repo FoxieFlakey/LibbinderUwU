@@ -1,6 +1,6 @@
 use std::sync::{Condvar, LazyLock, Mutex};
 
-use libbinder_runtime::{ArcRuntime, WeakRuntime, object::{Object, TransactionError}, packet::{Packet, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}};
+use libbinder_runtime::{ArcRuntime, WeakRuntime, object::{Object, TransactionError}, packet::{Packet, TransactionFlag, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}};
 
 use crate::{common::log, interface::{self, IObject, service_manager::{self, IServiceManager}}, process_sync::shared_completion::SharedCompletion};
 
@@ -66,6 +66,10 @@ impl IServiceManager for ServiceManager {
     Ok(())
   }
   
+  fn oneway_print(&self, data: &str) -> Result<(), TransactionError> {
+    self.print(data)
+  }
+  
   fn stop(&self) -> Result<(), TransactionError> {
     *self.stop_requested.lock().unwrap() = true;
     self.stop_wakeup.notify_all();
@@ -75,13 +79,19 @@ impl IServiceManager for ServiceManager {
 
 // Potentially can be compile time generated!
 impl Object<ServiceManager> for ServiceManager {
-  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, ServiceManager>) -> Result<Packet<'runtime, ServiceManager>, TransactionError> {
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, ServiceManager>) -> Result<Option<Packet<'runtime, ServiceManager>>, TransactionError> {
     assert!(self.runtime.ptr_eq(&packet.get_runtime().downgrade()), "attempt to process packet belonging to other runtime");
     let rt = packet.get_runtime();
     let mut reader = packet.reader(DeadSimpleFormatReader::new());
+    let is_oneway = packet.get_flags().contains(TransactionFlag::OneWay);
     
     match packet.get_code() {
       service_manager::PRINT => {
+        if is_oneway {
+          log!("Received print transaction but it was oneway, ignoring");
+          return Ok(None);
+        }
+        
         let Ok(arg1) = reader.read_str() else {
           let mut response = packet.get_runtime().new_packet();
           response.set_code(interface::ERROR_REPLY);
@@ -91,17 +101,22 @@ impl Object<ServiceManager> for ServiceManager {
           drop(writer);
           
           let resp = response.build();
-          return Ok(resp);
+          return Ok(Some(resp));
         };
         
         self.print(arg1).unwrap();
         
         let mut response = rt.new_packet();
         response.set_code(service_manager::PRINT_REPLY);
-        Ok(response.build())
+        Ok(Some(response.build()))
       }
       
       interface::IS_IMPLEMENTED => {
+        if is_oneway {
+          log!("Received is_implemented transaction but it was oneway, ignoring");
+          return Ok(None);
+        }
+        
         let Ok(arg1) = reader.read_u64() else {
           let mut response = packet.get_runtime().new_packet();
           response.set_code(interface::ERROR_REPLY);
@@ -111,7 +126,7 @@ impl Object<ServiceManager> for ServiceManager {
           drop(writer);
           
           let resp = response.build();
-          return Ok(resp);
+          return Ok(Some(resp));
         };
         
         let mut response = rt.new_packet();
@@ -121,18 +136,35 @@ impl Object<ServiceManager> for ServiceManager {
           response.set_code(interface::IS_IMPLEMENTED_REPLY_NO);
         }
         
-        Ok(response.build())
+        Ok(Some(response.build()))
       }
       
       service_manager::STOP => {
+        if is_oneway {
+          let mut response = packet.get_runtime().new_packet();
+          response.set_code(interface::ERROR_REPLY);
+          
+          let mut writer = response.writer(DeadSimpleFormat::new());
+          writer.write_str("Malformed transaction");
+          drop(writer);
+          
+          let resp = response.build();
+          return Ok(Some(resp));
+        }
+        
         self.stop().unwrap();
         
         let mut response = rt.new_packet();
         response.set_code(service_manager::STOP_REPLY);
-        Ok(response.build())
+        Ok(Some(response.build()))
       }
       
       x => {
+        if is_oneway {
+          // Cannot return error back in one way transaction, so lets ignore
+          return Ok(None);
+        }
+        
         let mut response = packet.get_runtime().new_packet();
         response.set_code(interface::ERROR_REPLY);
         log!("Received unknown code: 0x{x:x}");
@@ -141,7 +173,7 @@ impl Object<ServiceManager> for ServiceManager {
         writer.write_str(format!("Unrecognized transaction code: 0x{x:x}").as_str());
         drop(writer);
         
-        Ok(response.build())
+        Ok(Some(response.build()))
       }
     }
   }

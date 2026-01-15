@@ -1,7 +1,7 @@
 use std::{borrow::Cow, cell::RefCell, mem::{self, ManuallyDrop}, os::fd::BorrowedFd, sync::Arc};
 
 use libbinder::{command_buffer::{Command, CommandBuffer}, packet::Packet as libbinder_Packet, return_buffer::{ReturnBuffer, ReturnValue}};
-use libbinder_raw::types::reference::ObjectRefLocal;
+use libbinder_raw::{transaction::TransactionFlag, types::reference::ObjectRefLocal};
 
 use crate::{ArcRuntime, object::{self, Object}, packet::Packet};
 
@@ -169,9 +169,14 @@ impl Context {
           
           let mut cmd_buf = CommandBuffer::new(runtime.get_binder());
           
-          cmd_buf.enqueue_command(Command::SendReply(Cow::Borrowed(&reply.packet)))
-            .exec_always_block(None)
-            .unwrap();
+          if packet.get_flags().contains(TransactionFlag::OneWay) {
+            assert!(reply.is_none(), "This one way transaction!");
+          } else {
+            assert!(reply.is_some(), "This not oneway transaction!");
+            cmd_buf.enqueue_command(Command::SendReply(Cow::Borrowed(&reply.unwrap().packet)))
+              .exec_always_block(None)
+              .unwrap();
+          }
         }
         
         queued_transactions.clear();

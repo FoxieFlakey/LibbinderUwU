@@ -1,4 +1,4 @@
-use libbinder_runtime::{object::{FromProxy, Object, TransactionError}, packet::{Packet, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}, proxy::Proxy};
+use libbinder_runtime::{object::{FromProxy, Object, TransactionError}, packet::{Packet, TransactionFlag, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}, proxy::Proxy};
 
 use crate::interface::{self, IObject, service_manager::{self, IServiceManager}};
 
@@ -33,7 +33,7 @@ impl IServiceManager for IServiceManagerProxy {
       .write_str(data);
     let packet = packet.build();
     
-    let response = self.do_transaction(&packet)?;
+    let response = self.do_transaction(&packet)?.expect("This is not oneway transaction");
     let mut reader = response.reader(DeadSimpleFormatReader::new());
     
     if response.get_code() != service_manager::PRINT_REPLY {
@@ -48,6 +48,22 @@ impl IServiceManager for IServiceManagerProxy {
     Ok(())
   }
   
+  fn oneway_print(&self, data: &str) -> Result<(), TransactionError> {
+    let rt = self.proxy.get_runtime();
+    
+    let mut packet = rt.new_packet();
+    
+    // This one was intentionally made calling to non oneway print, to test logics
+    packet.set_code(service_manager::PRINT);
+    packet.set_flags(TransactionFlag::OneWay.into());
+    packet.writer(DeadSimpleFormat::new())
+      .write_str(data);
+    let packet = packet.build();
+    
+    self.do_transaction(&packet)?;
+    Ok(())
+  }
+  
   fn stop(&self) -> Result<(), TransactionError> {
     let rt = self.proxy.get_runtime();
     
@@ -55,7 +71,7 @@ impl IServiceManager for IServiceManagerProxy {
     packet.set_code(service_manager::STOP);
     let packet = packet.build();
     
-    let response = self.do_transaction(&packet)?;
+    let response = self.do_transaction(&packet)?.expect("This is not oneway transaction");
     let mut reader = response.reader(DeadSimpleFormatReader::new());
     
     if response.get_code() != service_manager::STOP_REPLY {
@@ -72,7 +88,7 @@ impl IServiceManager for IServiceManagerProxy {
 }
 
 impl Object<IServiceManagerProxy> for IServiceManagerProxy {
-  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, IServiceManagerProxy>) -> Result<Packet<'runtime, IServiceManagerProxy>, TransactionError> {
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, IServiceManagerProxy>) -> Result<Option<Packet<'runtime, IServiceManagerProxy>>, TransactionError> {
     self.proxy.do_transaction(packet)
   }
 }

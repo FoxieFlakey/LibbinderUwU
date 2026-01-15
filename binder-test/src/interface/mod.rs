@@ -27,6 +27,7 @@ pub mod service_manager {
   
   pub trait IServiceManager: IObject {
     fn print(&self, data: &str) -> Result<(), TransactionError>;
+    fn oneway_print(&self, data: &str) -> Result<(), TransactionError>;
     fn stop(&self) -> Result<(), TransactionError>;
   }
 }
@@ -39,7 +40,7 @@ pub fn is_implemented<Mgr: Object<Mgr>>(object: &Proxy<Mgr>, interface_id: u64) 
     .write_u64(interface_id);
   
   let packet = packet.build();
-  let ret = object.do_transaction(&packet)?;
+  let ret = object.do_transaction(&packet)?.expect("This is not oneway transaction");
   let mut reader = ret.reader(DeadSimpleFormatReader::new());
   
   match ret.get_code() {

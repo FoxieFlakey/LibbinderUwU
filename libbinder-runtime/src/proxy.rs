@@ -1,7 +1,7 @@
 use std::{borrow::Cow, mem::ManuallyDrop, sync::{Arc, atomic::{AtomicU64, Ordering}}};
 
 use libbinder::{command_buffer::{Command, CommandBuffer}, return_buffer::ReturnValue};
-use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRef, ObjectRefRemote};
+use libbinder_raw::{transaction::TransactionFlag, types::reference::{CONTEXT_MANAGER_REF, ObjectRef, ObjectRefRemote}};
 
 use crate::{ArcRuntime, WeakRuntime, context::Context, object::{self, FromProxy, Object, TransactionError}, packet::Packet};
 
@@ -49,7 +49,7 @@ impl<Mgr: Object<Mgr>> Proxy<Mgr> {
 }
 
 impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
-  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError> {
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Option<Packet<'runtime, Mgr>>, TransactionError> {
     assert!(
       self.runtime.ptr_eq(&packet.get_runtime().downgrade()),
       "attempting to send packet belonging to other runtime"
@@ -124,11 +124,21 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
       }
     });
     
+    let is_oneway = packet.get_flags().contains(TransactionFlag::OneWay);
     if let Some(x) = ret {
-      x
+      if is_oneway {
+        panic!("kernel responded with reply for one way transaction!");
+      }
+      x.map(|x| Some(x))
     } else {
       match (has_transaction_complete, has_failed) {
-        (true, false) => panic!("kernel didnt reply back"),
+        (true, false) => {
+          if !is_oneway {
+            panic!("kernel didnt reply back when expected");
+          } else {
+            Ok(None)
+          }
+        },
         (true, true) => Err(TransactionError::FailedReply),
         (false, _) => panic!("kernel did not response")
       }
@@ -151,7 +161,7 @@ impl FromProxy<SelfMananger> for SelfMananger {
 }
 
 impl Object<SelfMananger> for SelfMananger {
-  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, SelfMananger>) -> Result<Packet<'runtime, SelfMananger>, TransactionError> {
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, SelfMananger>) -> Result<Option<Packet<'runtime, SelfMananger>>, TransactionError> {
     self.0.do_transaction(packet)
   }
 }

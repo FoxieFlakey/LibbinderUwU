@@ -47,7 +47,7 @@ impl Debug for TransactionError {
 // Runtime will store the strong reference to object if its
 // sent outside
 pub trait Object<Mgr: Object<Mgr>>: Sync + Send + Any + 'static {
-  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Packet<'runtime, Mgr>, TransactionError>;
+  fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Option<Packet<'runtime, Mgr>>, TransactionError>;
 }
 
 pub trait FromProxy<Mgr: Object<Mgr>>: Object<Mgr> + Sized {

@@ -25,6 +25,7 @@ pub fn main() {
   manager.print("Hello World, sent from other process").unwrap();
   manager.print("Hello World, sent from other process").unwrap();
   manager.print("Hello World, sent from other process").unwrap();
+  manager.oneway_print("here is one way print").unwrap();
   manager.print("Hello World, sent from other process").unwrap();
   manager.print("Hello World, sent from other process").unwrap();
   manager.print("Hello World, sent from other process").unwrap();

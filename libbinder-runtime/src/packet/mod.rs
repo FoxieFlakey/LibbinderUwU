@@ -8,7 +8,8 @@ pub mod builder;
 
 use enumflags2::BitFlags;
 pub use libbinder::formats::*;
-use libbinder_raw::{transaction::TransactionFlag, types::reference::ObjectRef};
+pub use libbinder_raw::transaction::TransactionFlag;
+use libbinder_raw::types::reference::ObjectRef;
 
 #[derive(Clone)]
 pub struct Packet<'runtime, Mgr: Object<Mgr>> {
