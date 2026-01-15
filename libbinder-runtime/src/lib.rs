@@ -1,9 +1,9 @@
 #![feature(ptr_metadata)]
 
-use std::{collections::HashMap, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, Weak}, thread::{self, JoinHandle}};
+use std::{collections::HashMap, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, RwLock, Weak, atomic::AtomicU64}, thread::{self, JoinHandle}};
 
-use libbinder::packet::builder::PacketBuilder as libbinder_PacketBuilder;
-use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal};
+use libbinder::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder as libbinder_PacketBuilder};
+use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal, ObjectRefRemote};
 use nix::libc;
 use thread_local::ThreadLocal;
 
@@ -35,6 +35,10 @@ pub(crate) struct Shared<Mgr: Object<Mgr>> {
   // .0 and .1 will never be false at same time
   reference_states: Mutex<HashMap<ObjectRefLocal, (bool, bool)>>,
   
+  // The ref count here may be touched to 0 when only read lock
+  // is taken, check again when upgrade to write lock
+  remote_reference_counters: RwLock<HashMap<ObjectRefRemote, AtomicU64>>,
+  
   exec_context: ThreadLocal<context::Context>
 }
 
@@ -55,6 +59,18 @@ impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
     for (&local_ref, _) in self.reference_states.get_mut().unwrap().iter() {
       // Remove all currently exist references
       drop(unsafe { object::from_local_ref::<Mgr>(local_ref) });
+    }
+    
+    let mut buf = CommandBuffer::new(self.binder_dev.as_fd());
+    for (&remote_ref, counter) in self.remote_reference_counters.get_mut().unwrap().iter_mut() {
+      if *counter.get_mut() == 0 {
+        // There was stale reference inside
+        continue;
+      }
+      
+      buf = buf.clear();
+      buf.enqueue_command(Command::Release(remote_ref));
+      buf.exec_always_block(None).unwrap();
     }
   }
 }
@@ -81,7 +97,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   {
     Self::new_impl(binder_dev, |weak_rt| {
       manager_proxy_provider(weak_rt.clone(), Proxy::new(weak_rt, CONTEXT_MANAGER_REF))
-    })
+    }, false)
   }
   
   pub fn downgrade(&self) -> WeakRuntime<Mgr> {
@@ -93,7 +109,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   pub fn new_as_manager<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F) -> Result<Self, ()>
     where F: FnOnce(WeakRuntime<Mgr>) -> Arc<Mgr>
   {
-    let ret = Self::new_impl(binder_dev, manager_provider);
+    let ret = Self::new_impl(binder_dev, manager_provider, true);
     
     if let Ok(rt) = &ret {
       let mgr_ref = rt.____rt.mgr_local_ref.clone().unwrap();
@@ -103,7 +119,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     ret
   }
   
-  fn new_impl<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F) -> Result<Self, ()>
+  fn new_impl<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F, is_manager: bool) -> Result<Self, ()>
     where F: FnOnce(WeakRuntime<Mgr>) -> Arc<Mgr>
   {
     let binder_dev = Arc::new(binder_dev.into());
@@ -137,7 +153,10 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
         let ro2 = ro.clone();
         let mgr_ref = object::into_local_ref(mgr.clone());
         let mut ref_states = HashMap::new();
-        ref_states.insert(mgr_ref, (true, false));
+        
+        if is_manager {
+          ref_states.insert(mgr_ref, (true, false));
+        }
         
         Shared {
           mgr_local_ref: Some(mgr_ref),
@@ -147,6 +166,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
             worker(binder_dev2, weak_rt, ro2)
           }))),
           reference_states: Mutex::new(ref_states),
+          remote_reference_counters: RwLock::new(HashMap::new()),
           shutdown_pipe_wr: wr,
           _shutdown_pipe_ro: ro,
           exec_context: ThreadLocal::new(),

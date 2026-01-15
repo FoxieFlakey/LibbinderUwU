@@ -1,13 +1,38 @@
-use std::{borrow::Cow, mem::ManuallyDrop, sync::Arc};
+use std::{borrow::Cow, mem::ManuallyDrop, sync::{Arc, atomic::{AtomicU64, Ordering}}};
 
-use libbinder::{command_buffer::Command, return_buffer::ReturnValue};
-use libbinder_raw::types::reference::{ObjectRef, ObjectRefRemote};
+use libbinder::{command_buffer::{Command, CommandBuffer}, return_buffer::ReturnValue};
+use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRef, ObjectRefRemote};
 
 use crate::{WeakRuntime, context::Context, object::{self, Object, TransactionError}, packet::Packet};
 
 pub struct Proxy<Mgr: Object<Mgr>> {
   runtime: WeakRuntime<Mgr>,
   remote_ref: ObjectRefRemote
+}
+
+impl<Mgr: Object<Mgr>> Drop for Proxy<Mgr> {
+  fn drop(&mut self) {
+    if self.remote_ref == CONTEXT_MANAGER_REF {
+      // Context manager does not need BC_RELEASE or anything
+      return;
+    }
+    
+    if let Some(rt) = self.runtime.upgrade() {
+      let count_before = rt.____rt.remote_reference_counters.read().unwrap().get(&self.remote_ref).unwrap().fetch_sub(1, Ordering::Relaxed);
+      if count_before > 1 {
+        // There other reference do nothing
+        return;
+      }
+      
+      let mut cmd_buf = CommandBuffer::new(rt.get_binder());
+      cmd_buf.enqueue_command(Command::Release(self.remote_ref.clone()));
+      cmd_buf.exec_always_block(None).unwrap();
+      
+      rt.____rt.remote_reference_counters.write()
+        .unwrap()
+        .remove(&self.remote_ref);
+    }
+  }
 }
 
 impl<Mgr: Object<Mgr>> Proxy<Mgr> {
@@ -33,7 +58,6 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
     let mut has_transaction_complete = false;
     let mut has_failed = false;
     
-    // Keep local references alive
     for (_, reference) in packet.iter_references() {
       match reference {
         ObjectRef::Local(local) => {
@@ -46,7 +70,21 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
             .or_insert((true, false))
             .0 = true;
         },
-        ObjectRef::Remote(_) => ()
+        ObjectRef::Remote(remote) => {
+          // Get counter for the remote reference
+          let read_guard = rt.____rt.remote_reference_counters.read().unwrap() ;
+          if let Some(counter) = read_guard.get(&remote) {
+            counter.fetch_add(1, Ordering::Relaxed);
+          } else {
+            drop(read_guard);
+            
+            rt.____rt.remote_reference_counters.write()
+              .unwrap()
+              .entry(remote)
+              .or_insert(AtomicU64::new(0))
+              .fetch_add(1, Ordering::Relaxed);
+          }
+        }
       }
     }
     
