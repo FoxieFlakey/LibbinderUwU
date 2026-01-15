@@ -4,24 +4,24 @@ use libbinder_raw::types::reference::{ObjectRef, ObjectRefLocal, ObjectRefRemote
 
 use crate::{ArcRuntime, object::Object};
 
-pub struct LocalObject<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> {
+pub struct LocalObject<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> {
   pub(crate) runtime: ArcRuntime<Mgr>,
   pub(crate) inner: ObjectRefLocal,
   pub(crate) typed: Arc<T>
 }
 
-pub struct RemoteObject<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> {
+pub struct RemoteObject<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> {
   pub(crate) runtime: ArcRuntime<Mgr>,
   pub(crate) inner: ObjectRefRemote,
   pub(crate) typed: Arc<T>
 }
 
-pub enum Reference<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> {
+pub enum Reference<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> {
   Local(Arc<LocalObject<Mgr, T>>),
   Remote(Arc<RemoteObject<Mgr, T>>)
 }
 
-impl<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> Clone for Reference<Mgr, T> {
+impl<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> Clone for Reference<Mgr, T> {
   fn clone(&self) -> Self {
     match self {
       Reference::Local(x) => Self::Local(x.clone()),
@@ -31,7 +31,7 @@ impl<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> Clone for Reference<Mgr, T> {
 }
 
 
-impl<Mgr: Object<Mgr>, T: Object<Mgr> + ?Sized> Reference<Mgr, T> {
+impl<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> Reference<Mgr, T> {
   pub fn get(&self) -> &Arc<T> {
     match self {
       Reference::Local(x) => &x.typed,

@@ -37,7 +37,7 @@ pub mod service_manager {
 
 pub use service_manager::IServiceManager;
 
-pub fn is_implemented<Mgr: Object<Mgr>>(object: &Proxy<Mgr>, interface_id: u64) -> Result<bool, TransactionError> {
+pub fn is_implemented<Mgr: Object<Mgr> + ?Sized>(object: &Proxy<Mgr>, interface_id: u64) -> Result<bool, TransactionError> {
   let rt = object.get_runtime();
   let mut packet = rt.new_packet();
   packet.set_code(IS_IMPLEMENTED);

@@ -5,7 +5,7 @@ use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 
 use crate::{WeakRuntime, context::Context, object::Object};
 
-pub fn worker<Mgr: Object<Mgr>>(binder_dev: Arc<OwnedFd>, weak_rt: WeakRuntime<Mgr>, shutdown_pipe_ro: Arc<OwnedFd>) {
+pub fn worker<Mgr: Object<Mgr> + ?Sized>(binder_dev: Arc<OwnedFd>, weak_rt: WeakRuntime<Mgr>, shutdown_pipe_ro: Arc<OwnedFd>) {
   let ctx = Context::new(binder_dev.as_fd());
   
   let mut cmd_buf = CommandBuffer::new(binder_dev.as_fd());

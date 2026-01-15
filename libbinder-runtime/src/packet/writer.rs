@@ -5,17 +5,17 @@ use libbinder::formats::WriteFormat;
 
 use crate::{ArcRuntime, object::Object, reference::Reference};
 
-pub struct Writer<'packet, 'runtime: 'packet, Format: WriteFormat<'packet>, Mgr: Object<Mgr>> {
+pub struct Writer<'packet, 'runtime: 'packet, Format: WriteFormat<'packet>, Mgr: Object<Mgr> + ?Sized> {
   pub(super) runtime: &'runtime ArcRuntime<Mgr>,
   pub(super) writer: libbinder::packet::writer::Writer<'packet, 'runtime, Format>
 }
 
-impl<'packet, 'runtime: 'packet, Format: WriteFormat<'packet>, Mgr: Object<Mgr>> Writer<'packet, 'runtime, Format, Mgr> {
+impl<'packet, 'runtime: 'packet, Format: WriteFormat<'packet>, Mgr: Object<Mgr> + ?Sized> Writer<'packet, 'runtime, Format, Mgr> {
   pub fn get_runtime(&self) -> &'runtime ArcRuntime<Mgr> {
     self.runtime
   }
   
-  pub fn write_ref<T: Object<Mgr>>(&mut self, reference: &'packet Reference<Mgr, T>) -> &mut Self {
+  pub fn write_ref<T: Object<Mgr> + ?Sized>(&mut self, reference: &'packet Reference<Mgr, T>) -> &mut Self {
     assert!(self.runtime.ptr_eq(Reference::get_runtime(reference)), "attempt to write reference belonging to different runtime");
     self.writer.write_obj_ref(Reference::get_obj_ref(reference));
     self

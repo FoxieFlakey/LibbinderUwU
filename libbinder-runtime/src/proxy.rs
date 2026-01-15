@@ -5,12 +5,12 @@ use libbinder_raw::{transaction::TransactionFlag, types::reference::{CONTEXT_MAN
 
 use crate::{ArcRuntime, WeakRuntime, context::Context, object::{self, FromProxy, Object, TransactionError}, packet::Packet};
 
-pub struct Proxy<Mgr: Object<Mgr>> {
+pub struct Proxy<Mgr: Object<Mgr> + ?Sized> {
   runtime: WeakRuntime<Mgr>,
   remote_ref: ObjectRefRemote
 }
 
-impl<Mgr: Object<Mgr>> Drop for Proxy<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> Drop for Proxy<Mgr> {
   fn drop(&mut self) {
     if self.remote_ref == CONTEXT_MANAGER_REF {
       // Context manager does not need BC_RELEASE or anything
@@ -35,7 +35,7 @@ impl<Mgr: Object<Mgr>> Drop for Proxy<Mgr> {
   }
 }
 
-impl<Mgr: Object<Mgr>> Proxy<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> Proxy<Mgr> {
   pub(crate) fn new(weak_rt: WeakRuntime<Mgr>, remote_ref: ObjectRefRemote) -> Self {
     Self {
       runtime: weak_rt,
@@ -48,7 +48,7 @@ impl<Mgr: Object<Mgr>> Proxy<Mgr> {
   }
 }
 
-impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> Object<Mgr> for Proxy<Mgr> {
   fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Option<Packet<'runtime, Mgr>>, TransactionError> {
     assert!(
       self.runtime.ptr_eq(&packet.get_runtime().downgrade()),
@@ -146,7 +146,7 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
   }
 }
 
-impl<Mgr: Object<Mgr>> FromProxy<Mgr> for Proxy<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> FromProxy<Mgr> for Proxy<Mgr> {
   fn from_proxy(proxy: Proxy<Mgr>) -> Result<Self, ()> {
     Ok(proxy)
   }

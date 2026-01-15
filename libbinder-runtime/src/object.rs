@@ -46,16 +46,16 @@ impl Debug for TransactionError {
 //
 // Runtime will store the strong reference to object if its
 // sent outside
-pub trait Object<Mgr: Object<Mgr>>: Sync + Send + Any + 'static {
+pub trait Object<Mgr: Object<Mgr> + ?Sized>: Sync + Send + Any + 'static {
   fn do_transaction<'packet, 'runtime>(&self, packet: &'packet Packet<'runtime, Mgr>) -> Result<Option<Packet<'runtime, Mgr>>, TransactionError>;
 }
 
-pub trait FromProxy<Mgr: Object<Mgr>>: Object<Mgr> + Sized {
+pub trait FromProxy<Mgr: Object<Mgr> + ?Sized>: Object<Mgr> + Sized {
   fn from_proxy(proxy: Proxy<Mgr>) -> Result<Self, ()>;
 }
 
 // Does not touch the reference counter
-pub(crate) unsafe fn from_local_ref<Mgr: Object<Mgr>>(local_ref: ObjectRefLocal) -> Arc<dyn Object<Mgr>> {
+pub(crate) unsafe fn from_local_ref<Mgr: Object<Mgr> + ?Sized>(local_ref: ObjectRefLocal) -> Arc<dyn Object<Mgr>> {
   let raw = ptr::from_raw_parts::<dyn Object<Mgr>>(
     local_ref.data as *const (),
     // SAFETY: Lets set fire
@@ -66,7 +66,7 @@ pub(crate) unsafe fn from_local_ref<Mgr: Object<Mgr>>(local_ref: ObjectRefLocal)
 }
 
 // It leaks the Arc
-pub(crate) fn into_local_ref<Mgr: Object<Mgr>>(obj: Arc<dyn Object<Mgr>>) -> ObjectRefLocal {
+pub(crate) fn into_local_ref<Mgr: Object<Mgr> + ?Sized>(obj: Arc<dyn Object<Mgr>>) -> ObjectRefLocal {
   let (data, vtable) = Arc::into_raw(obj).to_raw_parts();
   ObjectRefLocal {
     data: data.addr(),

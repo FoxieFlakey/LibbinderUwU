@@ -6,7 +6,7 @@ use libbinder_raw::{transaction::TransactionFlag, types::reference::ObjectRef};
 
 use crate::{ArcRuntime, object::Object, packet::{Packet, writer::Writer}};
 
-pub struct PacketBuilder<'runtime, Mgr: Object<Mgr>> {
+pub struct PacketBuilder<'runtime, Mgr: Object<Mgr> + ?Sized> {
   pub(crate) runtime: &'runtime ArcRuntime<Mgr>,
   pub(crate) builder: libbinder::packet::builder::PacketBuilder<'runtime>,
   
@@ -16,7 +16,7 @@ pub struct PacketBuilder<'runtime, Mgr: Object<Mgr>> {
   pub(super) _kept_refs: Vec<(ObjectRef, Option<Arc<dyn Object<Mgr>>>)>
 }
 
-impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr>> PacketBuilder<'runtime, Mgr> {
+impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr> + ?Sized> PacketBuilder<'runtime, Mgr> {
   pub(crate) fn new(runtime: &'runtime ArcRuntime<Mgr>) -> Self {
     Self {
       builder: libbinder::packet::builder::PacketBuilder::new(runtime.get_binder()),

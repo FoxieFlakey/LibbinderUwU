@@ -29,20 +29,20 @@ impl Context {
   }
   
   // ret_handle_func is the function which handle individual return value
-  pub fn exec<'data, 'runtime: 'data, F1, F2, Mgr: Object<Mgr>>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1, ret_handle_func: F2)
+  pub fn exec<'data, 'runtime: 'data, F1, F2, Mgr: Object<Mgr> + ?Sized>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1, ret_handle_func: F2)
     where F1: FnOnce(&mut CommandBuffer<'runtime, 'data>),
       F2: FnMut(&ReturnValue<'runtime>)
   {
     self.exec_impl(runtime, command_builder, ret_handle_func, true);
   }
   
-  pub fn exec_without_ret<'data, 'runtime: 'data, F1, Mgr: Object<Mgr>>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1)
+  pub fn exec_without_ret<'data, 'runtime: 'data, F1, Mgr: Object<Mgr> + ?Sized>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1)
     where F1: FnOnce(&mut CommandBuffer<'runtime, 'data>)
   {
     self.exec_impl(runtime, command_builder, |_| panic!("unexpected"), false);
   }
   
-  fn exec_impl<'data, 'runtime: 'data, F1, F2, Mgr: Object<Mgr>>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1, mut ret_handle_func: F2, with_ret: bool)
+  fn exec_impl<'data, 'runtime: 'data, F1, F2, Mgr: Object<Mgr> + ?Sized>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1, mut ret_handle_func: F2, with_ret: bool)
     where F1: FnOnce(&mut CommandBuffer<'runtime, 'data>),
       F2: FnMut(&ReturnValue<'runtime>)
   {

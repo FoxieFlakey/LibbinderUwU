@@ -18,7 +18,7 @@ mod util;
 mod worker;
 mod context;
 
-pub(crate) struct Shared<Mgr: Object<Mgr>> {
+pub(crate) struct Shared<Mgr: Object<Mgr> + ?Sized> {
   pub(crate) binder_dev: Arc<OwnedFd>,
   mgr: RwLock<(Option<Arc<Mgr>>, Option<ObjectRefLocal>)>,
   
@@ -42,10 +42,10 @@ pub(crate) struct Shared<Mgr: Object<Mgr>> {
   exec_context: ThreadLocal<context::Context>
 }
 
-unsafe impl<Mgr: Object<Mgr>> Sync for Shared<Mgr> {}
-unsafe impl<Mgr: Object<Mgr>> Send for Shared<Mgr> {}
+unsafe impl<Mgr: Object<Mgr> + ?Sized> Sync for Shared<Mgr> {}
+unsafe impl<Mgr: Object<Mgr> + ?Sized> Send for Shared<Mgr> {}
 
-impl<Mgr: Object<Mgr>> Shared<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> Shared<Mgr> {
   fn stop_looper(&self) {
     let handle = self.worker.lock().unwrap().take();
     if let Some(thrd) = handle {
@@ -58,7 +58,7 @@ impl<Mgr: Object<Mgr>> Shared<Mgr> {
   }
 }
 
-impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> Drop for Shared<Mgr> {
   fn drop(&mut self) {
     self.stop_looper();
     
@@ -81,11 +81,11 @@ impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
   }
 }
 
-pub struct ArcRuntime<Mgr: Object<Mgr>> {
+pub struct ArcRuntime<Mgr: Object<Mgr> + ?Sized> {
   pub(crate) ____rt: Arc<Shared<Mgr>>
 }
 
-impl<Mgr: Object<Mgr>> Clone for ArcRuntime<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> Clone for ArcRuntime<Mgr> {
   fn clone(&self) -> Self {
     Self {
       ____rt: self.____rt.clone()
@@ -105,12 +105,6 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     let mgr = Arc::new(manager_proxy_provider(rt.clone(), Proxy::new(rt.downgrade(), CONTEXT_MANAGER_REF)));
     *rt.____rt.mgr.write().unwrap() = (Some(mgr), None);
     Ok(rt)
-  }
-  
-  pub fn downgrade(&self) -> WeakRuntime<Mgr> {
-    WeakRuntime {
-      ____rt: Arc::downgrade(&self.____rt)
-    }
   }
   
   pub fn new_as_manager<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F) -> Result<Self, ()>
@@ -175,6 +169,14 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     };
     Ok(ret)
   }
+}
+
+impl<Mgr: Object<Mgr> + ?Sized> ArcRuntime<Mgr> {
+  pub fn downgrade(&self) -> WeakRuntime<Mgr> {
+    WeakRuntime {
+      ____rt: Arc::downgrade(&self.____rt)
+    }
+  }
   
   pub fn get_manager(&self) -> Arc<Mgr> {
     self.____rt.mgr.read().unwrap().0.clone().unwrap()
@@ -201,11 +203,11 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   }
 }
 
-pub struct WeakRuntime<Mgr: Object<Mgr>> {
+pub struct WeakRuntime<Mgr: Object<Mgr> + ?Sized> {
   ____rt: Weak<Shared<Mgr>>
 }
 
-impl<Mgr: Object<Mgr>> Clone for WeakRuntime<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> Clone for WeakRuntime<Mgr> {
   fn clone(&self) -> Self {
     Self {
       ____rt: self.____rt.clone()
@@ -213,7 +215,7 @@ impl<Mgr: Object<Mgr>> Clone for WeakRuntime<Mgr> {
   }
 }
 
-impl<Mgr: Object<Mgr>> WeakRuntime<Mgr> {
+impl<Mgr: Object<Mgr> + ?Sized> WeakRuntime<Mgr> {
   pub fn upgrade(&self) -> Option<ArcRuntime<Mgr>> {
     Some(ArcRuntime {
       ____rt: self.____rt.upgrade()?

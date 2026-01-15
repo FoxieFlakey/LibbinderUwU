@@ -12,13 +12,13 @@ pub use libbinder_raw::transaction::TransactionFlag;
 use libbinder_raw::types::reference::ObjectRef;
 
 #[derive(Clone)]
-pub struct Packet<'runtime, Mgr: Object<Mgr>> {
+pub struct Packet<'runtime, Mgr: Object<Mgr> + ?Sized> {
   pub(crate) runtime: &'runtime ArcRuntime<Mgr>,
   pub(crate) packet: libbinder::packet::Packet<'runtime>,
   refs: Vec<(ObjectRef, Option<Arc<dyn Object<Mgr>>>)>
 }
 
-impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr>> Packet<'runtime, Mgr> {
+impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr> + ?Sized> Packet<'runtime, Mgr> {
   pub fn new(runtime: &'runtime ArcRuntime<Mgr>, packet: libbinder::packet::Packet<'runtime>) -> Self {
     let mut refs = Vec::new();
     

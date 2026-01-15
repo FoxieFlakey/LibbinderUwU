@@ -6,12 +6,12 @@ use libbinder_raw::types::reference::ObjectRef;
 
 use crate::{ArcRuntime, object::{self, FromProxy, Object}, proxy::Proxy, reference::{LocalObject, Reference, RemoteObject}};
 
-pub struct Reader<'packet, 'runtime: 'packet, Format: ReadFormat<'packet>, Mgr: Object<Mgr>> {
+pub struct Reader<'packet, 'runtime: 'packet, Format: ReadFormat<'packet>, Mgr: Object<Mgr> + ?Sized> {
   pub(super) runtime: &'runtime ArcRuntime<Mgr>,
   pub(super) reader: libbinder::packet::reader::Reader<'packet, 'runtime, Format>
 }
 
-impl<'packet, 'runtime: 'packet, Format: ReadFormat<'packet>, Mgr: Object<Mgr>> Reader<'packet, 'runtime, Format, Mgr> {
+impl<'packet, 'runtime: 'packet, Format: ReadFormat<'packet>, Mgr: Object<Mgr> + ?Sized> Reader<'packet, 'runtime, Format, Mgr> {
   pub fn get_runtime(&self) -> &'runtime ArcRuntime<Mgr> {
     self.runtime
   }
