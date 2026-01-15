@@ -1,6 +1,6 @@
 use libbinder_runtime::{object::{FromProxy, Object, TransactionError}, packet::{Packet, TransactionFlag, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}, proxy::Proxy};
 
-use crate::interface::{self, IObject, service_manager::{self, IServiceManager}};
+use crate::interface;
 
 pub struct IServiceManagerProxy {
   proxy: Proxy<IServiceManagerProxy>
@@ -8,7 +8,7 @@ pub struct IServiceManagerProxy {
 
 impl FromProxy<IServiceManagerProxy> for IServiceManagerProxy {
   fn from_proxy(proxy: Proxy<IServiceManagerProxy>) -> Result<Self, ()> {
-    if interface::is_implemented(&proxy, service_manager::INTERFACE_ID).map_err(|_| ())? {
+    if interface::is_implemented(&proxy, interface::service_manager::ID).map_err(|_| ())? {
       Ok(Self { proxy })
     } else {
       Err(())
@@ -17,18 +17,18 @@ impl FromProxy<IServiceManagerProxy> for IServiceManagerProxy {
 }
 
 // Potentially can be compile time generated!
-impl IObject for IServiceManagerProxy {
+impl interface::IObject for IServiceManagerProxy {
   fn is_implemented(&self, interface_id: u64) -> Result<bool, TransactionError> {
     interface::is_implemented(&self.proxy, interface_id)
   }
 }
 
-impl IServiceManager for IServiceManagerProxy {
+impl interface::IServiceManager for IServiceManagerProxy {
   fn print(&self, data: &str) -> Result<(), TransactionError> {
     let rt = self.proxy.get_runtime();
     
     let mut packet = rt.new_packet();
-    packet.set_code(service_manager::PRINT);
+    packet.set_code(interface::service_manager::PRINT);
     packet.writer(DeadSimpleFormat::new())
       .write_str(data);
     let packet = packet.build();
@@ -36,7 +36,7 @@ impl IServiceManager for IServiceManagerProxy {
     let response = self.do_transaction(&packet)?.expect("This is not oneway transaction");
     let mut reader = response.reader(DeadSimpleFormatReader::new());
     
-    if response.get_code() != service_manager::PRINT_REPLY {
+    if response.get_code() != interface::service_manager::PRINT_REPLY {
       if response.get_code() == interface::ERROR_REPLY {
         if let Ok(error_msg) = reader.read_str() {
           return Err(TransactionError::RemoteError(Box::new(format!("Remote error: {}", error_msg))));
@@ -54,7 +54,7 @@ impl IServiceManager for IServiceManagerProxy {
     let mut packet = rt.new_packet();
     
     // This one was intentionally made calling to non oneway print, to test logics
-    packet.set_code(service_manager::ONEWAY_PRINT);
+    packet.set_code(interface::service_manager::ONEWAY_PRINT);
     packet.set_flags(TransactionFlag::OneWay.into());
     packet.writer(DeadSimpleFormat::new())
       .write_str(data);
@@ -68,13 +68,13 @@ impl IServiceManager for IServiceManagerProxy {
     let rt = self.proxy.get_runtime();
     
     let mut packet = rt.new_packet();
-    packet.set_code(service_manager::STOP);
+    packet.set_code(interface::service_manager::STOP);
     let packet = packet.build();
     
     let response = self.do_transaction(&packet)?.expect("This is not oneway transaction");
     let mut reader = response.reader(DeadSimpleFormatReader::new());
     
-    if response.get_code() != service_manager::STOP_REPLY {
+    if response.get_code() != interface::service_manager::STOP_REPLY {
       if response.get_code() == interface::ERROR_REPLY {
         if let Ok(error_msg) = reader.read_str() {
           return Err(TransactionError::RemoteError(Box::new(format!("Remote error: {}", error_msg))));

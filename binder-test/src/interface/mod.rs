@@ -16,7 +16,7 @@ pub mod service_manager {
   use libbinder_runtime::object::TransactionError;
   use crate::interface::IObject;
   
-  pub const INTERFACE_ID: u64 = 0;
+  pub const ID: u64 = 0;
   
   pub const STOP: u32 = 0x100;
   pub const STOP_REPLY: u32 = 0x100;
@@ -34,6 +34,8 @@ pub mod service_manager {
     fn stop(&self) -> Result<(), TransactionError>;
   }
 }
+
+pub use service_manager::IServiceManager;
 
 pub fn is_implemented<Mgr: Object<Mgr>>(object: &Proxy<Mgr>, interface_id: u64) -> Result<bool, TransactionError> {
   let rt = object.get_runtime();

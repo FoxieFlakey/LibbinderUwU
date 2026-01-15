@@ -2,7 +2,7 @@ use std::sync::{Condvar, LazyLock, Mutex};
 
 use libbinder_runtime::{ArcRuntime, WeakRuntime, object::{Object, TransactionError}, packet::{Packet, TransactionFlag, dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}}};
 
-use crate::{common::log, interface::{self, IObject, service_manager::{self, IServiceManager}}, process_sync::shared_completion::SharedCompletion};
+use crate::{common::log, interface::{self, IObject, IServiceManager}, process_sync::shared_completion::SharedCompletion};
 
 static READY: LazyLock<SharedCompletion> = LazyLock::new(|| SharedCompletion::new());
 
@@ -50,9 +50,9 @@ impl ServiceManager {
   }
 }
 
-impl IObject for ServiceManager {
+impl interface::IObject for ServiceManager {
   fn is_implemented(&self, interface_id: u64) -> Result<bool, TransactionError> {
-    if interface_id == service_manager::INTERFACE_ID {
+    if interface_id == interface::service_manager::ID {
       Ok(true)
     } else {
       Ok(false)
@@ -60,7 +60,7 @@ impl IObject for ServiceManager {
   }
 }
 
-impl IServiceManager for ServiceManager {
+impl interface::IServiceManager for ServiceManager {
   fn print(&self, data: &str) -> Result<(), TransactionError> {
     log!("Service manager was requested to print: '{data}'");
     Ok(())
@@ -87,7 +87,7 @@ impl Object<ServiceManager> for ServiceManager {
     let is_oneway = packet.get_flags().contains(TransactionFlag::OneWay);
     
     match packet.get_code() {
-      service_manager::PRINT => {
+      interface::service_manager::PRINT => {
         if is_oneway {
           log!("Received print transaction but it was oneway, ignoring");
           return Ok(None);
@@ -108,11 +108,11 @@ impl Object<ServiceManager> for ServiceManager {
         self.print(arg1).unwrap();
         
         let mut response = rt.new_packet();
-        response.set_code(service_manager::PRINT_REPLY);
+        response.set_code(interface::service_manager::PRINT_REPLY);
         Ok(Some(response.build()))
       }
       
-      service_manager::ONEWAY_PRINT => {
+      interface::service_manager::ONEWAY_PRINT => {
         if !is_oneway {
           let mut response = packet.get_runtime().new_packet();
           response.set_code(interface::ERROR_REPLY);
@@ -169,7 +169,7 @@ impl Object<ServiceManager> for ServiceManager {
         Ok(Some(response.build()))
       }
       
-      service_manager::STOP => {
+      interface::service_manager::STOP => {
         if is_oneway {
           let mut response = packet.get_runtime().new_packet();
           response.set_code(interface::ERROR_REPLY);
@@ -185,7 +185,7 @@ impl Object<ServiceManager> for ServiceManager {
         self.stop().unwrap();
         
         let mut response = rt.new_packet();
-        response.set_code(service_manager::STOP_REPLY);
+        response.set_code(interface::service_manager::STOP_REPLY);
         Ok(Some(response.build()))
       }
       

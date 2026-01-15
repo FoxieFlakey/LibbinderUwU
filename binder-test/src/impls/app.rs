@@ -2,20 +2,20 @@ use std::sync::Arc;
 
 use libbinder_runtime::{ArcRuntime, object::FromProxy};
 
-use crate::{common::log, impls::service_manager, interface::{self, service_manager::IServiceManager}, proxy::service_manager::IServiceManagerProxy};
+use crate::{common::log, impls, interface, proxy};
 
 pub fn init() {
 }
 
 pub fn main() {
-  service_manager::wait();
+  impls::service_manager::wait();
   
   let binder_dev = nix::fcntl::open("/dev/binder", nix::fcntl::OFlag::O_CLOEXEC | nix::fcntl::OFlag::O_NONBLOCK | nix::fcntl::OFlag::O_RDWR, nix::sys::stat::Mode::empty()).unwrap();
-  let runtime = ArcRuntime::new(binder_dev, |_, proxy| IServiceManagerProxy::from_proxy(proxy).unwrap())
+  let runtime = ArcRuntime::new(binder_dev, |_, proxy| proxy::IServiceManagerProxy::from_proxy(proxy).unwrap())
     .unwrap();
-  let manager = (runtime.get_manager().clone()) as Arc<dyn IServiceManager>;
+  let manager = (runtime.get_manager().clone()) as Arc<dyn interface::IServiceManager>;
   
-  if manager.is_implemented(interface::service_manager::INTERFACE_ID).unwrap() {
+  if manager.is_implemented(interface::service_manager::ID).unwrap() {
     log!("IServerManager is implemented by manager");
   } else {
     log!("IServerManager is not implemented by manager");
