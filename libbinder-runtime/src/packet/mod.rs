@@ -5,6 +5,7 @@ pub mod writer;
 pub mod builder;
 
 pub use libbinder::formats::*;
+use libbinder_raw::types::reference::ObjectRef;
 
 #[derive(Clone)]
 pub struct Packet<'runtime, Mgr: Object<Mgr>> {
@@ -29,6 +30,10 @@ impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr>> Packet<'runtime, Mgr> {
       runtime: self.runtime,
       builder: self.packet.into()
     }
+  }
+  
+  pub fn iter_references(&self) -> impl Iterator<Item = (usize, ObjectRef)> {
+    self.packet.iter_references()
   }
 }
 

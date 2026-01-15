@@ -133,8 +133,11 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
         
         let ro = Arc::new(ro);
         let ro2 = ro.clone();
+        let obj = BoxedObject::new(mgr.clone());
+        obj.done_constructing();
+        
         Shared {
-          mgr_local_ref: Some(unsafe { BoxedObject::new(mgr.clone()).into_raw() }),
+          mgr_local_ref: Some(unsafe { obj.into_raw() }),
           mgr,
           _binder_mem: binder_mem,
           worker: Mutex::new(Some(thread::spawn(move || {

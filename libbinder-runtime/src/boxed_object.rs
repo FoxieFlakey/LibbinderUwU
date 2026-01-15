@@ -12,6 +12,7 @@ struct ObjectData<Mgr: Object<Mgr>> {
 const REF_STRONG_BIT: u8 = 0x01;
 const REF_WEAK_BIT: u8 = 0x02;
 const REF_DEAD_BIT: u8 = 0x04;
+const REF_UNDER_CONSTRUCTION: u8 = 0x08;
 
 pub(crate) struct BoxedObject<Mgr: Object<Mgr>> {
   inner: Box<ObjectData<Mgr>>
@@ -22,9 +23,14 @@ impl<Mgr: Object<Mgr>> BoxedObject<Mgr> {
     BoxedObject {
       inner: Box::new(ObjectData {
         reference: obj,
-        ref_tracker: AtomicU8::new(REF_STRONG_BIT)
+        ref_tracker: AtomicU8::new(REF_UNDER_CONSTRUCTION)
       })
     }
+  }
+  
+  pub fn done_constructing(&self) {
+    let ret = self.inner.ref_tracker.fetch_and(!REF_UNDER_CONSTRUCTION, Ordering::Relaxed);
+    assert!(ret & REF_UNDER_CONSTRUCTION != 0);
   }
   
   fn check_for_access(&self) {
@@ -32,6 +38,10 @@ impl<Mgr: Object<Mgr>> BoxedObject<Mgr> {
   }
   
   fn check_bits_for_access(bits: u8) {
+    if bits & REF_UNDER_CONSTRUCTION != 0 {
+      panic!("Object is under construction");
+    }
+    
     if bits & REF_DEAD_BIT != 0 {
       panic!("Attempt to use dead boxed object!");
     }
