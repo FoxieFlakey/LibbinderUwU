@@ -1,6 +1,6 @@
 #![feature(box_as_ptr)]
 
-use std::{mem::ManuallyDrop, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, Weak}, thread::{self, JoinHandle}};
+use std::{collections::HashMap, mem::ManuallyDrop, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, RwLock, Weak}, thread::{self, JoinHandle}};
 
 use libbinder::packet::builder::PacketBuilder as libbinder_PacketBuilder;
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal};
@@ -30,6 +30,8 @@ pub(crate) struct Shared<Mgr: Object<Mgr>> {
   shutdown_pipe_wr: OwnedFd,
   _shutdown_pipe_ro: Arc<OwnedFd>,
   worker: Mutex<Option<JoinHandle<()>>>,
+  
+  local_objects_sent_outside: RwLock<HashMap<ObjectRefLocal, BoxedObject<Mgr>>>,
   
   exec_context: ThreadLocal<context::Context>
 }
@@ -138,6 +140,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
           worker: Mutex::new(Some(thread::spawn(move || {
             worker(binder_dev2, weak_rt, ro2)
           }))),
+          local_objects_sent_outside: RwLock::new(HashMap::new()),
           shutdown_pipe_wr: wr,
           _shutdown_pipe_ro: ro,
           exec_context: ThreadLocal::new(),

@@ -66,6 +66,10 @@ impl Context {
             obj.on_bc_release();
             
             if obj.is_dead() {
+              // Remove from live object map
+              let mut map = runtime.____rt.local_objects_sent_outside.write().unwrap();
+              map.remove(local_ref)
+                .expect("Local object was not in the live objects map, for some reason");
               unsafe { ManuallyDrop::drop(&mut obj) };
             }
           },
@@ -74,6 +78,10 @@ impl Context {
             obj.on_bc_decrefs();
             
             if obj.is_dead() {
+              // Remove from live object map
+              let mut map = runtime.____rt.local_objects_sent_outside.write().unwrap();
+              map.remove(local_ref)
+                .expect("Local object was not in the live objects map, for some reason");
               unsafe { ManuallyDrop::drop(&mut obj) };
             }
           },
