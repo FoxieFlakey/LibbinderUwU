@@ -8,6 +8,10 @@ use crate::{packet::Packet, return_buffer::ReturnBuffer};
 pub enum Command<'binder: 'data, 'data> {
   EnterLooper,
   ExitLooper,
+  Acquire(ObjectRefRemote),
+  Release(ObjectRefRemote),
+  AcquireWeak(ObjectRefRemote),
+  ReleaseWeak(ObjectRefRemote),
   SendTransaction(ObjectRefRemote, Cow<'data, Packet<'binder>>),
   SendReply(Cow<'data, Packet<'binder>>),
   RegisterLooper
@@ -68,6 +72,22 @@ impl<'binder, 'data> CommandBuffer<'binder, 'data> {
   
   pub fn enqueue_command(&mut self, cmd: Command<'binder, 'data>) -> &mut Self {
     match cmd {
+      Command::Acquire(remote_ref) => {
+        self.buffer.extend_from_slice(&CommandRaw::Acquire.as_bytes());
+        self.buffer.extend_from_slice(&remote_ref.data_handle.to_ne_bytes());
+      },
+      Command::Release(remote_ref) => {
+        self.buffer.extend_from_slice(&CommandRaw::Release.as_bytes());
+        self.buffer.extend_from_slice(&remote_ref.data_handle.to_ne_bytes());
+      },
+      Command::AcquireWeak(remote_ref) => {
+        self.buffer.extend_from_slice(&CommandRaw::AcquireWeak.as_bytes());
+        self.buffer.extend_from_slice(&remote_ref.data_handle.to_ne_bytes());
+      },
+      Command::ReleaseWeak(remote_ref) => {
+        self.buffer.extend_from_slice(&CommandRaw::ReleaseWeak.as_bytes());
+        self.buffer.extend_from_slice(&remote_ref.data_handle.to_ne_bytes());
+      },
       Command::EnterLooper => self.buffer.extend_from_slice(&CommandRaw::EnterLooper.as_bytes()),
       Command::ExitLooper => self.buffer.extend_from_slice(&CommandRaw::ExitLooper.as_bytes()),
       Command::RegisterLooper => self.buffer.extend_from_slice(&CommandRaw::RegisterLooper.as_bytes()),

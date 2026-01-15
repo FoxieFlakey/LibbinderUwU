@@ -10,6 +10,10 @@ const BINDER_CMD_MAGIC: u8 = b'c';
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, TryFromPrimitive)]
 pub enum Command {
+  Acquire = request_code_write!(BINDER_CMD_MAGIC, 5, size_of::<u32>()),
+  Release = request_code_write!(BINDER_CMD_MAGIC, 6, size_of::<u32>()),
+  AcquireWeak = request_code_write!(BINDER_CMD_MAGIC, 4, size_of::<u32>()),
+  ReleaseWeak = request_code_write!(BINDER_CMD_MAGIC, 7, size_of::<u32>()),
   SendTransaction = request_code_write!(BINDER_CMD_MAGIC, 0, size_of::<TransactionDataRaw>()),
   SendReply = request_code_write!(BINDER_CMD_MAGIC, 1, size_of::<TransactionDataRaw>()),
   FreeBuffer = request_code_write!(BINDER_CMD_MAGIC, 3, size_of::<BinderUsize>()),
