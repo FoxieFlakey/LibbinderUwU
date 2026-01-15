@@ -87,6 +87,10 @@ impl<'packet> InnerReader<'packet> for ReaderState<'packet> {
       return Err(());
     }
     
+    if size > self.current_slice.len() {
+      return Err(());
+    }
+    
     let ret = &self.current_slice[..size];
     self.current_slice = &self.current_slice[size..];
     Ok(ret)
