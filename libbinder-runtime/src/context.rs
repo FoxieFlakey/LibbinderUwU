@@ -144,7 +144,7 @@ impl Context {
         // Process queue transactions after processing all return values
         for (obj, packet) in queued_transactions.drain(..) {
           let obj = ManuallyDrop::new(unsafe { object::from_local_ref(obj.clone()) });
-          let packet = Packet { runtime: runtime, packet };
+          let packet = Packet::new(runtime, packet);
           let reply = obj.do_transaction(&packet).unwrap();
           
           let mut cmd_buf = CommandBuffer::new(runtime.get_binder());

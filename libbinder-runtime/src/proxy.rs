@@ -126,10 +126,7 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
       match v {
         ReturnValue::Reply(packet) => {
           assert!(ret.is_none());
-          ret = Some(Ok(Packet {
-            runtime: rt,
-            packet: packet.clone()
-          }));
+          ret = Some(Ok(Packet::new(rt, packet.clone())));
         },
         ReturnValue::Noop => (),
         _ => panic!("Unexpected")

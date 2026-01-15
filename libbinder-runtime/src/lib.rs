@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, RwLock, Weak, atomic::AtomicU64}, thread::{self, JoinHandle}};
 
-use libbinder::{command_buffer::{Command, CommandBuffer}, packet::builder::PacketBuilder as libbinder_PacketBuilder};
+use libbinder::command_buffer::{Command, CommandBuffer};
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal, ObjectRefRemote};
 use nix::libc;
 use thread_local::ThreadLocal;
@@ -182,10 +182,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   }
   
   pub fn new_packet<'runtime>(&'runtime self) -> PacketBuilder<'runtime, Mgr> {
-    PacketBuilder {
-      builder: libbinder_PacketBuilder::new(self.____rt.binder_dev.as_fd()),
-      runtime: self
-    }
+    PacketBuilder::new(self)
   }
   
   pub fn get_binder<'runtime>(&'runtime self) -> BorrowedFd<'runtime> {
