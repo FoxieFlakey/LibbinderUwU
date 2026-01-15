@@ -1,4 +1,4 @@
-use std::{borrow::Cow, error::Error, fmt::Display};
+use std::borrow::Cow;
 
 use libbinder::{command_buffer::Command, return_buffer::ReturnValue};
 use libbinder_raw::types::reference::ObjectRefRemote;
@@ -27,9 +27,13 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
     );
     
     let rt = packet.get_runtime();
-    let ctx = rt.____rt.exec_context.get_or(|| Context::new(rt.clone()));
+    let ctx = rt.____rt.exec_context.get_or(|| Context::new(rt.get_binder()));
     let mut ret = None;
     
+    let mut has_transaction_complete = false;
+    let mut has_failed = false;
+    
+    // Send the reply
     ctx.exec(rt, |cmd_buf| {
       cmd_buf.enqueue_command(Command::SendTransaction(self.remote_ref.clone(), Cow::Borrowed(&packet.packet)));
     }, |v| {
@@ -39,6 +43,32 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
         ReturnValue::AcquireWeak(_) => todo!(),
         ReturnValue::Release(_) => todo!(),
         ReturnValue::ReleaseWeak(_) => todo!(),
+        ReturnValue::Reply(_) => {
+          panic!("Reply is not expected here");
+        },
+        ReturnValue::TransactionFailed => has_failed = true,
+        ReturnValue::Ok => todo!(),
+        ReturnValue::Error(_) => todo!(),
+        ReturnValue::SpawnLooper => todo!(),
+        ReturnValue::TransactionComplete => {
+          println!("Transaction complete");
+          has_transaction_complete = true;
+        },
+        ReturnValue::DeadReply => {
+          assert!(ret.is_none());
+          ret = Some(Err(TransactionError::UnreachableTarget));
+        },
+        ReturnValue::Noop => ()
+      }
+    });
+    
+    if !has_transaction_complete {
+      panic!("Kernel unable to send transaction!");
+    }
+    
+    // Then read the result
+    ctx.exec(rt, |_| (), |v| {
+      match v {
         ReturnValue::Reply(packet) => {
           assert!(ret.is_none());
           ret = Some(Ok(Packet {
@@ -46,32 +76,20 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
             packet: packet.clone()
           }));
         },
-        ReturnValue::TransactionFailed => todo!(),
-        ReturnValue::Ok => todo!(),
-        ReturnValue::Error(_) => todo!(),
-        ReturnValue::SpawnLooper => todo!(),
-        ReturnValue::TransactionComplete => println!("Transaction complete"),
-        ReturnValue::DeadReply => {
-          assert!(ret.is_none());
-          ret = Some(Err(TransactionError::DeadTarget));
-        },
-        ReturnValue::Noop => ()
+        ReturnValue::Noop => (),
+        _ => panic!("Unexpected")
       }
     });
     
-    #[derive(Debug)]
-    struct ErrorMsg(&'static str);
-    
-    impl Display for ErrorMsg {
-      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.0)
+    if let Some(x) = ret {
+      x
+    } else {
+      match (has_transaction_complete, has_failed) {
+        (true, false) => panic!("kernel didnt reply back"),
+        (true, true) => Err(TransactionError::FailedReply),
+        (false, _) => panic!("kernel did not response")
       }
     }
-    
-    impl Error for ErrorMsg {
-    }
-    
-    Err(TransactionError::MiscellanousError(Box::new(ErrorMsg("Error Unexpected"))))
   }
 }
 

@@ -6,7 +6,14 @@ use crate::packet::Packet;
 #[derive(Debug)]
 pub enum TransactionError {
   // The target of reply/transaction, no longer exist
-  DeadTarget,
+  UnreachableTarget,
+  
+  // The transaction is sent, but then target dies
+  // no reply is given but the transaction did sent
+  NoReply,
+  
+  // Transaction did not sent at all
+  FailedReply,
   
   // Miscellanous error
   MiscellanousError(Box<dyn Error>)

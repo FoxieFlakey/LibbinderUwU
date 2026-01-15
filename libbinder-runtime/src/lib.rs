@@ -1,28 +1,36 @@
 #![feature(box_as_ptr)]
 
-use std::{mem::ManuallyDrop, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Weak}};
+use std::{mem::ManuallyDrop, os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd}, ptr, sync::{Arc, Mutex, Weak}, thread::{self, JoinHandle}};
 
 use libbinder::packet::builder::PacketBuilder as libbinder_PacketBuilder;
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal};
 use nix::libc;
+use thread_local::ThreadLocal;
 
-use crate::{object::{BoxedObject, Object}, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap};
+use crate::{object::{BoxedObject, Object}, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap, worker::worker};
 
 pub mod object;
 pub mod packet;
 pub mod proxy;
 
 mod util;
+mod worker;
+mod context;
 
 pub(crate) struct Shared<Mgr: Object<Mgr>> {
-  binder_dev: Arc<OwnedFd>,
+  pub(crate) binder_dev: Arc<OwnedFd>,
   mgr: Arc<Mgr>,
   
   mgr_local_ref: Option<ObjectRefLocal>,
   
   // Used by Binder to store incoming transaction and buffer :3
   // don't need to be used
-  _binder_mem: OwnedMmap
+  _binder_mem: OwnedMmap,
+  shutdown_pipe_wr: OwnedFd,
+  _shutdown_pipe_ro: Arc<OwnedFd>,
+  worker: Mutex<Option<JoinHandle<()>>>,
+  
+  exec_context: ThreadLocal<context::Context>
 }
 
 unsafe impl<Mgr: Object<Mgr>> Sync for Shared<Mgr> {}
@@ -30,6 +38,15 @@ unsafe impl<Mgr: Object<Mgr>> Send for Shared<Mgr> {}
 
 impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
   fn drop(&mut self) {
+    let handle = self.worker.lock().unwrap().take();
+    if let Some(thrd) = handle {
+      nix::unistd::write(self.shutdown_pipe_wr.as_fd(), "UwU".as_bytes()).unwrap();
+      
+      if thread::current().id() != thrd.thread().id() {
+        thrd.join().unwrap();
+      }
+    }
+    
     // Context manager not used anymore, drop it
     unsafe {
       ManuallyDrop::drop(&mut BoxedObject::<Mgr>::from_raw(self.mgr_local_ref.take().unwrap()));
@@ -37,9 +54,16 @@ impl<Mgr: Object<Mgr>> Drop for Shared<Mgr> {
   }
 }
 
-#[derive(Clone)]
 pub struct ArcRuntime<Mgr: Object<Mgr>> {
-  ____rt: Arc<Shared<Mgr>>
+  pub(crate) ____rt: Arc<Shared<Mgr>>
+}
+
+impl<Mgr: Object<Mgr>> Clone for ArcRuntime<Mgr> {
+  fn clone(&self) -> Self {
+    Self {
+      ____rt: self.____rt.clone()
+    }
+  }
 }
 
 pub fn new_proxy_manager<B: Into<OwnedFd>>(binder_dev: B) -> Result<ArcRuntime<SelfMananger>, ()> {
@@ -96,19 +120,31 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
       }
     };
     
-    Ok(ArcRuntime {
+    let ret  = ArcRuntime {
       ____rt: Arc::new_cyclic(|weak| {
         let weak_rt = WeakRuntime { ____rt: weak.clone() };
-        let mgr = manager_provider(weak_rt);
+        let mgr = manager_provider(weak_rt.clone());
+        let binder_dev2 = binder_dev.clone();
         
+        let (ro, wr) = nix::unistd::pipe().unwrap();
+        
+        let ro = Arc::new(ro);
+        let ro2 = ro.clone();
         Shared {
           mgr_local_ref: Some(unsafe { BoxedObject::new(mgr.clone()).into_raw() }),
           mgr,
           _binder_mem: binder_mem,
+          worker: Mutex::new(Some(thread::spawn(move || {
+            worker(binder_dev2, weak_rt, ro2)
+          }))),
+          shutdown_pipe_wr: wr,
+          _shutdown_pipe_ro: ro,
+          exec_context: ThreadLocal::new(),
           binder_dev
         }
       })
-    })
+    };
+    Ok(ret)
   }
   
   pub fn get_manager(&self) -> &Arc<Mgr> {
