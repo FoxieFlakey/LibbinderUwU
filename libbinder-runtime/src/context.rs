@@ -29,7 +29,20 @@ impl Context {
   }
   
   // ret_handle_func is the function which handle individual return value
-  pub fn exec<'data, 'runtime: 'data, F1, F2, Mgr: Object<Mgr>>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1, mut ret_handle_func: F2)
+  pub fn exec<'data, 'runtime: 'data, F1, F2, Mgr: Object<Mgr>>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1, ret_handle_func: F2)
+    where F1: FnOnce(&mut CommandBuffer<'runtime, 'data>),
+      F2: FnMut(&ReturnValue<'runtime>)
+  {
+    self.exec_impl(runtime, command_builder, ret_handle_func, true);
+  }
+  
+  pub fn exec_without_ret<'data, 'runtime: 'data, F1, Mgr: Object<Mgr>>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1)
+    where F1: FnOnce(&mut CommandBuffer<'runtime, 'data>)
+  {
+    self.exec_impl(runtime, command_builder, |_| panic!("unexpected"), false);
+  }
+  
+  fn exec_impl<'data, 'runtime: 'data, F1, F2, Mgr: Object<Mgr>>(&self, runtime: &'runtime ArcRuntime<Mgr>, command_builder: F1, mut ret_handle_func: F2, with_ret: bool)
     where F1: FnOnce(&mut CommandBuffer<'runtime, 'data>),
       F2: FnMut(&ReturnValue<'runtime>)
   {
@@ -45,10 +58,17 @@ impl Context {
       // Run initial commands
       if is_initial {
         (builder.take().unwrap())(&mut cmd_buf);
-        cmd_buf.exec_always_block(Some(&mut ret_buf)).unwrap();
+        
+        if with_ret {
+          cmd_buf.exec_always_block(Some(&mut ret_buf)).unwrap();
+        } else {
+          cmd_buf.exec_always_block(None).unwrap();
+        }
       }
       
       for ret in ret_buf.get_parsed() {
+        assert!(with_ret);
+        
         match ret {
           ReturnValue::Transaction(transaction) => {
             queued_transactions.push((transaction.0.clone(), transaction.1.clone()));
@@ -152,8 +172,6 @@ impl Context {
           cmd_buf.enqueue_command(Command::SendReply(Cow::Borrowed(&reply.packet)))
             .exec_always_block(None)
             .unwrap();
-          
-          // print!("Responded");
         }
         
         queued_transactions.clear();

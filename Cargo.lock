@@ -137,6 +137,7 @@ name = "libbinder-runtime"
 version = "0.1.0"
 dependencies = [
  "delegate",
+ "enumflags2",
  "libbinder",
  "libbinder-raw",
  "nix",

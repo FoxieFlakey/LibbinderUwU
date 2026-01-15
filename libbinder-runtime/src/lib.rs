@@ -89,12 +89,12 @@ impl<Mgr: Object<Mgr>> Clone for ArcRuntime<Mgr> {
 }
 
 pub fn new_proxy_manager<B: Into<OwnedFd>>(binder_dev: B) -> Result<ArcRuntime<SelfMananger>, ()> {
-  ArcRuntime::new(binder_dev, |_, proxy| Arc::new(SelfMananger(proxy)))
+  ArcRuntime::new(binder_dev, |_, proxy| SelfMananger(proxy))
 }
 
 impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   pub fn new<F, B: Into<OwnedFd>>(binder_dev: B, manager_proxy_provider: F) -> Result<Self, ()>
-    where F: FnOnce(WeakRuntime<Mgr>, Proxy<Mgr>) -> Arc<Mgr>
+    where F: FnOnce(WeakRuntime<Mgr>, Proxy<Mgr>) -> Mgr
   {
     Self::new_impl(binder_dev, |weak_rt| {
       manager_proxy_provider(weak_rt.clone(), Proxy::new(weak_rt, CONTEXT_MANAGER_REF))
@@ -108,7 +108,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   }
   
   pub fn new_as_manager<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F) -> Result<Self, ()>
-    where F: FnOnce(WeakRuntime<Mgr>) -> Arc<Mgr>
+    where F: FnOnce(WeakRuntime<Mgr>) -> Mgr
   {
     let ret = Self::new_impl(binder_dev, manager_provider, true);
     
@@ -121,7 +121,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
   }
   
   fn new_impl<F, B: Into<OwnedFd>>(binder_dev: B, manager_provider: F, is_manager: bool) -> Result<Self, ()>
-    where F: FnOnce(WeakRuntime<Mgr>) -> Arc<Mgr>
+    where F: FnOnce(WeakRuntime<Mgr>) -> Mgr
   {
     let binder_dev = Arc::new(binder_dev.into());
     let binder_mem = {
@@ -145,7 +145,7 @@ impl<Mgr: Object<Mgr>> ArcRuntime<Mgr> {
     let ret  = ArcRuntime {
       ____rt: Arc::new_cyclic(|weak| {
         let weak_rt = WeakRuntime { ____rt: weak.clone() };
-        let mgr = manager_provider(weak_rt.clone());
+        let mgr = Arc::new(manager_provider(weak_rt.clone()));
         let binder_dev2 = binder_dev.clone();
         
         let (ro, wr) = nix::unistd::pipe().unwrap();

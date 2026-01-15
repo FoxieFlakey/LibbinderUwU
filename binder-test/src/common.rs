@@ -1,8 +1,12 @@
+use std::sync::RwLock;
+
 use nix::unistd;
+
+pub static CURRENT_NAME: RwLock<&str> = RwLock::new("Bootstrap");
 
 pub fn log_impl(str: &str) {
   let mut buffer = String::new();
-  buffer.push_str(&format!("[{}] {str}", unistd::getpid()));
+  buffer.push_str(&format!("[{}] [{}] {str}", CURRENT_NAME.read().unwrap(), unistd::getpid()));
   buffer.push_str("\n");
   
   print!("{}", buffer);

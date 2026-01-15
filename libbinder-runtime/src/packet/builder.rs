@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use enumflags2::BitFlags;
 use libbinder::formats::WriteFormat;
-use libbinder_raw::types::reference::ObjectRef;
+use libbinder_raw::{transaction::TransactionFlag, types::reference::ObjectRef};
 
 use crate::{ArcRuntime, object::Object, packet::{Packet, writer::Writer}};
 
@@ -26,6 +27,11 @@ impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr>> PacketBuilder<'runtime, Mgr> 
   
   pub fn get_runtime(&self) -> &'runtime ArcRuntime<Mgr> {
     &self.runtime
+  }
+  
+  pub fn set_flags(&mut self, flags: BitFlags<TransactionFlag>) -> &mut Self {
+    self.builder.set_flags(flags);
+    self
   }
   
   pub fn set_code(&mut self, code: u32) -> &mut Self {

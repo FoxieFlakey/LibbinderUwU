@@ -1,12 +1,17 @@
 #![feature(never_type)]
 
-use std::{fmt::Write, fs::File, process::exit, sync::Arc, thread, time::Duration};
+use std::{env, fmt::Write, process::exit, sync::atomic::{AtomicBool, Ordering}};
 
-use libbinder_runtime::{ArcRuntime, WeakRuntime, object::Object, packet::dead_simple::{DeadSimpleFormat, DeadSimpleFormatReader}};
 use nix::{sys::wait::waitpid, unistd::{ForkResult, Pid, fork}};
+
+use common::log;
 
 mod common;
 mod process_sync;
+
+mod interface;
+mod proxy;
+mod impls;
 
 pub fn hexdump(bytes: &[u8]) {
   let (chunks, remainder) = bytes.as_chunks::<32>();
@@ -34,62 +39,59 @@ fn divide<F: FnOnce()>(on_child: F) -> Pid {
   }
 }
 
+const TASKS_TO_START: [(&str, fn(), fn()); 2] = [
+  ("service-manager", impls::service_manager::init, impls::service_manager::main),
+  ("app", impls::app::init, impls::app::main)
+];
+
+static IS_ALONE: AtomicBool = AtomicBool::new(false);
+
+pub fn is_alone() -> bool {
+  IS_ALONE.load(Ordering::Relaxed)
+}
+
 fn main() {
-  [
-    divide(|| {
-      let binder_dev = File::open("/dev/binder").unwrap();
-      struct ContextManager {
-        weak_rt: WeakRuntime<ContextManager>
-      }
+  let args: Vec<String> = env::args().collect();
+  for task in TASKS_TO_START.iter() {
+    task.1()
+  }
+  
+  if args.len() == 1 {
+    let mut tasks = Vec::new();
+    for task in TASKS_TO_START.iter() {
+      tasks.push(divide(|| {
+        *common::CURRENT_NAME.write().unwrap() = task.0;
+        log!("Starting");
+        task.2();
+        log!("Stopped");
+      }));
+    }
+    
+    log!("Waiting for childs to stop");
+    for pid in tasks.iter() {
+      waitpid(*pid, None).unwrap();
+    }
+  } else if args.len() == 2 {
+    let service_name = &args[1];
+    let service = TASKS_TO_START.iter()
+      .filter(|x| x.0 == service_name)
+      .next();
+    
+    if let Some(task) = service {
+      *common::CURRENT_NAME.write().unwrap() = task.0;
+      IS_ALONE.store(true, Ordering::Relaxed);
       
-      impl Drop for ContextManager {
-        fn drop(&mut self) {
-          println!("Ctx manager dropped");
-        }
-      }
-      
-      impl Object<ContextManager> for ContextManager {
-        fn do_transaction<'packet, 'runtime>(&self, packet: &'packet libbinder_runtime::packet::Packet<'runtime, ContextManager>) -> Result<libbinder_runtime::packet::Packet<'runtime, ContextManager>, libbinder_runtime::object::TransactionError> {
-          let rt = packet.get_runtime();
-          assert!(rt.downgrade().ptr_eq(&self.weak_rt), "attempt to do transaction belonging other runtime");
-          
-          let mut builder = rt
-            .new_packet();
-          
-          builder.set_code(0)
-            .writer(DeadSimpleFormat::new())
-            .write_str("Hello World UwU");
-          
-          Ok(builder.build())
-        }
-      }
-      
-      let _rt = ArcRuntime::new_as_manager(binder_dev, |weak_rt| {
-        Arc::new(ContextManager { weak_rt })
-      });
-      
-      thread::sleep(Duration::from_secs(5));
-    }),
-    divide(|| {
-      thread::sleep(Duration::from_secs(2));
-      
-      let binder_dev = File::open("/dev/binder").unwrap();
-      let rt = libbinder_runtime::new_proxy_manager(binder_dev).unwrap();
-      let mut packet = rt.new_packet();
-      packet
-        .set_code(0)
-        .writer(DeadSimpleFormat::new())
-        .write_str("Hello World!")
-        .write_bool(true);
-      
-      let response = rt.get_manager().do_transaction(&packet.build()).unwrap();
-      let response = response.reader(DeadSimpleFormatReader::new())
-        .read_str()
-        .unwrap();
-      println!("Response '{response}'");
-    })
-  ].iter().for_each(|pid| {
-    waitpid(*pid, None).unwrap();
-  });
+      log!("Starting");
+      task.2();
+      log!("Stopped");
+    } else {
+      eprintln!("Service '{service_name}' not found");
+    }
+  } else {
+    eprintln!("Usage: {} [service to start]", args[0]);
+    eprintln!(" When given argument start that specific service");
+    eprintln!(" else all will be started");
+    exit(1);
+  }
 }
 

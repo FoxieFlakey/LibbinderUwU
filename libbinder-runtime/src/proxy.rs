@@ -3,7 +3,7 @@ use std::{borrow::Cow, mem::ManuallyDrop, sync::{Arc, atomic::{AtomicU64, Orderi
 use libbinder::{command_buffer::{Command, CommandBuffer}, return_buffer::ReturnValue};
 use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRef, ObjectRefRemote};
 
-use crate::{WeakRuntime, context::Context, object::{self, FromProxy, Object, TransactionError}, packet::Packet};
+use crate::{ArcRuntime, WeakRuntime, context::Context, object::{self, FromProxy, Object, TransactionError}, packet::Packet};
 
 pub struct Proxy<Mgr: Object<Mgr>> {
   runtime: WeakRuntime<Mgr>,
@@ -41,6 +41,10 @@ impl<Mgr: Object<Mgr>> Proxy<Mgr> {
       runtime: weak_rt,
       remote_ref
     }
+  }
+  
+  pub fn get_runtime(&self) -> ArcRuntime<Mgr> {
+    self.runtime.upgrade().unwrap()
   }
 }
 
@@ -89,47 +93,34 @@ impl<Mgr: Object<Mgr>> Object<Mgr> for Proxy<Mgr> {
     }
     
     // Send the reply
-    ctx.exec(rt, |cmd_buf| {
+    ctx.exec_without_ret(rt, |cmd_buf| {
       cmd_buf.enqueue_command(Command::SendTransaction(self.remote_ref.clone(), Cow::Borrowed(&packet.packet)));
-    }, |v| {
+    });
+    
+    // Then read the result
+    ctx.exec(rt, |_| (), |v| {
       match v {
+        ReturnValue::Noop => (),
         ReturnValue::Transaction(_) => todo!(),
         ReturnValue::Acquire(_) => todo!(),
         ReturnValue::AcquireWeak(_) => todo!(),
         ReturnValue::Release(_) => todo!(),
         ReturnValue::ReleaseWeak(_) => todo!(),
-        ReturnValue::Reply(_) => {
-          panic!("Reply is not expected here");
+        ReturnValue::Reply(packet) => {
+          assert!(ret.is_none());
+          ret = Some(Ok(Packet::new(rt, packet.clone())));
         },
         ReturnValue::TransactionFailed => has_failed = true,
         ReturnValue::Ok => todo!(),
         ReturnValue::Error(_) => todo!(),
         ReturnValue::SpawnLooper => todo!(),
         ReturnValue::TransactionComplete => {
-          println!("Transaction complete");
           has_transaction_complete = true;
         },
         ReturnValue::DeadReply => {
           assert!(ret.is_none());
           ret = Some(Err(TransactionError::UnreachableTarget));
-        },
-        ReturnValue::Noop => ()
-      }
-    });
-    
-    if !has_transaction_complete {
-      panic!("Kernel unable to send transaction!");
-    }
-    
-    // Then read the result
-    ctx.exec(rt, |_| (), |v| {
-      match v {
-        ReturnValue::Reply(packet) => {
-          assert!(ret.is_none());
-          ret = Some(Ok(Packet::new(rt, packet.clone())));
-        },
-        ReturnValue::Noop => (),
-        _ => panic!("Unexpected")
+        }
       }
     });
     

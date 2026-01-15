@@ -1,0 +1,27 @@
+use std::sync::Arc;
+
+use libbinder_runtime::{ArcRuntime, object::FromProxy};
+
+use crate::{impls::service_manager, interface::service_manager::IServiceManager, proxy::service_manager::IServiceManagerProxy};
+
+pub fn init() {
+}
+
+pub fn main() {
+  service_manager::wait();
+  
+  let binder_dev = nix::fcntl::open("/dev/binder", nix::fcntl::OFlag::O_CLOEXEC | nix::fcntl::OFlag::O_NONBLOCK | nix::fcntl::OFlag::O_RDWR, nix::sys::stat::Mode::empty()).unwrap();
+  let runtime = ArcRuntime::new(binder_dev, |_, proxy| IServiceManagerProxy::from_proxy(proxy).unwrap())
+    .unwrap();
+  let manager = (runtime.get_manager().clone()) as Arc<dyn IServiceManager>;
+  
+  manager.print("Hello World, sent from other process").unwrap();
+  manager.print("Hello World, sent from other process").unwrap();
+  manager.print("Hello World, sent from other process").unwrap();
+  manager.print("Hello World, sent from other process").unwrap();
+  manager.print("Hello World, sent from other process").unwrap();
+  manager.print("Hello World, sent from other process").unwrap();
+  manager.print("Hello World, sent from other process").unwrap();
+  manager.stop().unwrap();
+}
+

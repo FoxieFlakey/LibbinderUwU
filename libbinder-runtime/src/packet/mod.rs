@@ -6,8 +6,9 @@ pub mod reader;
 pub mod writer;
 pub mod builder;
 
+use enumflags2::BitFlags;
 pub use libbinder::formats::*;
-use libbinder_raw::types::reference::ObjectRef;
+use libbinder_raw::{transaction::TransactionFlag, types::reference::ObjectRef};
 
 #[derive(Clone)]
 pub struct Packet<'runtime, Mgr: Object<Mgr>> {
@@ -65,6 +66,14 @@ impl<'packet, 'runtime: 'packet, Mgr: Object<Mgr>> Packet<'runtime, Mgr> {
   
   pub fn iter_references(&self) -> impl Iterator<Item = (usize, ObjectRef)> {
     self.packet.iter_references()
+  }
+  
+  pub fn get_code(&self) -> u32 {
+    self.packet.get_code()
+  }
+  
+  pub fn get_flags(&self) -> BitFlags<TransactionFlag> {
+    self.packet.get_flags()
   }
 }
 

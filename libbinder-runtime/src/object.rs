@@ -1,10 +1,9 @@
-use std::{any::Any, error::Error, mem, ptr::{self, DynMetadata}, sync::Arc};
+use std::{any::Any, fmt::{Debug, Display}, mem, ptr::{self, DynMetadata}, sync::Arc};
 
 use libbinder_raw::types::reference::ObjectRefLocal;
 
 use crate::{packet::Packet, proxy::Proxy};
 
-#[derive(Debug)]
 pub enum TransactionError {
   // The target of reply/transaction, no longer exist
   UnreachableTarget,
@@ -16,8 +15,30 @@ pub enum TransactionError {
   // Transaction did not sent at all
   FailedReply,
   
-  // Miscellanous error
-  MiscellanousError(Box<dyn Error>)
+  // The reply was malformed
+  MalformedReply,
+  
+  // Error message from local, in this case the transaction did not get sent
+  // runtime never uses this, it exists for convenience
+  LocalError(Box<dyn Display>),
+  
+  // Error message from remote target, in this case the transaction did get sent
+  // but remote errored out
+  // runtime never uses this, it exists for convenience
+  RemoteError(Box<dyn Display>)
+}
+
+impl Debug for TransactionError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      TransactionError::UnreachableTarget => writeln!(f, "UnreachableTarget"),
+      TransactionError::NoReply => writeln!(f, "NoReply"),
+      TransactionError::FailedReply =>  writeln!(f, "FailedReply"),
+      TransactionError::MalformedReply =>  writeln!(f, "MalformedReply"),
+      TransactionError::LocalError(display) => display.fmt(f),
+      TransactionError::RemoteError(display) => display.fmt(f)
+    }
+  }
 }
 
 // About storing ArcRuntime, caller should store only weak
