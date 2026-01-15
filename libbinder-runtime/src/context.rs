@@ -3,7 +3,7 @@ use std::{borrow::Cow, cell::RefCell, mem, os::fd::BorrowedFd};
 use libbinder::{command_buffer::{Command, CommandBuffer}, packet::Packet as libbinder_Packet, return_buffer::{ReturnBuffer, ReturnValue}};
 use libbinder_raw::types::reference::ObjectRefLocal;
 
-use crate::{ArcRuntime, object::{BoxedObject, Object}, packet::Packet};
+use crate::{ArcRuntime, object::Object, boxed_object::BoxedObject, packet::Packet};
 
 struct Session {
   ret_buf: (Vec<ReturnValue<'static>>, Vec<u8>),

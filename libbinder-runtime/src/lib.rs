@@ -7,7 +7,7 @@ use libbinder_raw::types::reference::{CONTEXT_MANAGER_REF, ObjectRefLocal};
 use nix::libc;
 use thread_local::ThreadLocal;
 
-use crate::{object::{BoxedObject, Object}, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap, worker::worker};
+use crate::{object::Object, boxed_object::BoxedObject, packet::builder::PacketBuilder, proxy::{Proxy, SelfMananger}, util::OwnedMmap, worker::worker};
 
 pub mod object;
 pub mod packet;
@@ -15,6 +15,7 @@ pub mod proxy;
 
 mod util;
 mod worker;
+mod boxed_object;
 mod context;
 
 pub(crate) struct Shared<Mgr: Object<Mgr>> {
