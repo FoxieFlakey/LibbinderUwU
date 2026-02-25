@@ -1,5 +1,4 @@
 #![feature(never_type)]
-#![feature(alloc_layout_extra)]
 
 pub mod packet;
 pub mod command_buffer;

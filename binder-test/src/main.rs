@@ -39,9 +39,7 @@ fn divide<F: FnOnce()>(on_child: F) -> Pid {
   }
 }
 
-const TASKS_TO_START: [(&str, fn(), fn()); 2] = [
-  ("service-manager", impls::service_manager::init, impls::service_manager::main),
-  ("app", impls::app::init, impls::app::main)
+const TASKS_TO_START: [(&str, fn(), fn()); 0] = [
 ];
 
 static IS_ALONE: AtomicBool = AtomicBool::new(false);
