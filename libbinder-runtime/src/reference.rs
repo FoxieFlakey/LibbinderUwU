@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use libbinder_raw::types::reference::{ObjectRef, ObjectRefLocal, ObjectRefRemote};
 
-use crate::{ArcRuntime, object::Object};
+use crate::{ArcRuntime, object::{self, Object}};
 
 pub struct LocalObject<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> {
   pub(crate) runtime: ArcRuntime<Mgr>,
@@ -30,6 +30,15 @@ impl<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> Clone for Reference<Mgr
   }
 }
 
+impl<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr>> Reference<Mgr, T> {
+  pub fn from_local(runtime: ArcRuntime<Mgr>, local: Arc<T>) -> Self {
+    Self::Local(Arc::new(LocalObject {
+      inner: object::into_local_ref(local.clone()),
+      typed: local,
+      runtime
+    }))
+  }
+}
 
 impl<Mgr: Object<Mgr> + ?Sized, T: Object<Mgr> + ?Sized> Reference<Mgr, T> {
   pub fn get(&self) -> &Arc<T> {
